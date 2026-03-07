@@ -1,37 +1,79 @@
-# Local .terraform directories
+# =========================
+# Terraform (インフラ構築ツール)
+# =========================
+# ローカルでダウンロードされたプロバイダなどのプラグインキャッシュ
 .terraform/
 
-# .tfstate files
+# インフラの現在の状態を記録したファイル（パスワードなどが平文で保存されるため絶対に公開しない）
 *.tfstate
 *.tfstate.*
 
-# Crash log files
+# エラー発生時のクラッシュログ
 crash.log
 crash.*.log
 
-# Exclude all .tfvars files, which are likely to contain sensitive data, such as
-# password, private keys, and other secrets. These should not be part of version 
-# control as they are data points which are potentially sensitive and subject 
-# to change depending on the environment.
+# 環境ごとの変数定義ファイル（機密データが含まれる可能性が高いため除外）
 *.tfvars
 *.tfvars.json
 
-# Ignore override files as they are usually used to override resources locally and so
-# are not checked in
+# ローカル環境でのみ一時的に設定を上書きするためのファイル
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
 
-# Ignore transient lock info files created by terraform apply
+# Terraform実行中に状態ファイルが競合しないようにするためのロック情報
 .terraform.tfstate.lock.info
 
-# Include override files you do wish to add to version control using negated pattern
-# !example_override.tf
-
-# Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
-# example: *tfplan*
-
-# Ignore CLI configuration files
+# Terraform CLIのローカル設定ファイル
 .terraformrc
 terraform.rc
+
+# =========================
+# Ansible (サーバー構成管理ツール)
+# =========================
+# 処理が失敗した際に生成される再試行用の記録ファイル
+*.retry
+
+# AnsibleのローカルキャッシュやGalaxyで取得したロールの保存先
+.ansible/
+
+# Ansible Vault（暗号化機能）の復号パスワードを記したファイル（絶対に公開しない）
+vault-password.txt
+
+# =========================
+# Node.js / Qiita CLI (記事管理ツール)
+# =========================
+# インストールしたパッケージ本体（容量が大きく、package.jsonがあれば再構築できるため除外）
+node_modules/
+
+# パッケージ管理ツールのエラーログ
+npm-debug.log
+yarn-error.log
+
+# =========================
+# 機密情報・シークレット全般
+# =========================
+# APIキーやパスワードなどの環境変数を直書きするファイル（絶対に公開しない）
+.env
+.env.*
+
+# SSH接続などで使用する秘密鍵ファイル
+*.pem
+*.key
+
+# =========================
+# OS & エディタの自動生成ファイル
+# =========================
+# macOSが自動生成するフォルダの表示設定ファイル
+.DS_Store
+
+# Windowsが自動生成する画像サムネイルのキャッシュ
+Thumbs.db
+
+# VSCodeやIntelliJなどのエディタが作成するローカル設定フォルダ
+.idea/
+.vscode/
+
+# Vimなどのテキストエディタが編集中に作成する一時（スワップ）ファイル
+*.swp
