@@ -1,0 +1,23 @@
+{
+  "name": "devoka-homelab",
+  "version": "1.0.0",
+  "description": "商用Readyな自宅IaaS基盤を構築・管理するための統合リポジトリです。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devoka-jpn/devoka-homelab.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/devoka-jpn/devoka-homelab/issues"
+  },
+  "homepage": "https://github.com/devoka-jpn/devoka-homelab#readme"
+}
