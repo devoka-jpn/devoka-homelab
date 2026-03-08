@@ -24,7 +24,7 @@
 システム全体の計算資源（CPU、メモリ）と物理的なデータ保存領域を提供する最下層のハードウェア基盤である。3台のベアメタルPCノードと、物理ネットワーク機器（L2/L3スイッチ等）で構成される。
 
 
-*(※ `docs/assets/images/01_physical_wiring.drawio.svg` の参照)*
+![物理配線図](../assets/images/01_physical_wiring.drawio.svg)
 
 **物理ノード インベントリ**
 
@@ -42,23 +42,81 @@
 ネットワークは管理、ストレージ同期、およびテナント（VM）の各トラフィックを単一のフラットなL2ネットワーク（`192.168.11.0/24`）に統合して運用する。これにより、物理ハードウェアのNIC制約をクリアしつつ、IaCによるプロビジョニングやCI/CDパイプラインの実践にフォーカス可能な基盤とする。
 
 
-*(※ `docs/assets/images/02_logical_network.drawio.svg` の参照)*
+![論理ネットワーク図](../assets/images/02_logical_network.drawio.svg)
 
 ### 2.3. 運用・管理・付帯系レイヤー (Core Services & Management Layer)
 
 ハイパーバイザー上で稼働し、基盤全体の運用、セキュリティ、および可観測性を担保する必須コンポーネント群である。これらはIaC（Terraform / Ansible）によって状態が管理される。
 
 
-*(※ `docs/assets/images/03_service_architecture.drawio.svg` の参照)*
+![サービスアーキテクチャ図](../assets/images/03_service_architecture.drawio.svg)
 
 * **監視・モニタリング (Zabbix):** ハードウェアからミドルウェアまでの死活監視、パフォーマンスメトリクス収集、異常検知。
 * **統合認証・IDM (OpenLDAP):** 基盤内の全システム・機器に対するアカウント管理とアクセス権限の一元化。
 * **プロジェクト・運用管理 (Redmine):** 構成変更の履歴（チケット）、タスク管理、インシデント対応のトラッキング。
-* **名前解決・DDNS (Bind):** 内部ネットワークにおける動的な名前解決とゾーン管理。
+* **名前解決・DDNS (BIND9 + Kea DHCP):** 内部ネットワークにおける動的な名前解決とゾーン管理。Primary / Secondary の冗長構成で `devoka-jpn.com` ゾーンを管理し、DHCP 配布と連動した動的 DNS 登録（DDNS）を実現する。詳細は [`docs/specs/ddns.md`](../specs/ddns.md) を参照。
+
+**管理系VMインベントリ**
+
+| Hostname | VMID | 役割 | OS | vCPU | RAM | Disk | IP アドレス |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| hip1tk-pvdesk01 | 103 | IaaS管理踏み台VM（IaC実行・開発基盤） | Ubuntu 24.04.4 LTS | 4 | 8GiB | 25GiB | 動的（DDNS） |
+| hip1tk-pvdns01 | 200 | Primary DNS / DHCP サーバ | Ubuntu 24.04.4 LTS | テンプレートデフォルト | テンプレートデフォルト | テンプレートデフォルト | 192.168.11.53 |
+| hip1tk-pvdns02 | 201 | Secondary DNS / DHCP サーバ | Ubuntu 24.04.4 LTS | テンプレートデフォルト | テンプレートデフォルト | テンプレートデフォルト | 192.168.11.54 |
+
+*(※ hip1tk-pvdesk01 はTerraform/Ansible等のIaCツールを実行する管理専用VMであり、Proxmoxクラスタ上のKVM仮想マシンとして稼働する。IPアドレスはDDNSにより動的に割り当てられる。)*
+*(※ hip1tk-pvdns01/02 の詳細仕様・設計は [`docs/specs/ddns.md`](../specs/ddns.md) を参照。)*
 
 ### 2.4. ホスティング・テナントレイヤー (Tenant Layer)
 
 付帯系サービスによる統制の下で稼働する、実用アプリケーション群、技術検証用のサンドボックス環境、および **OpenStack** 等のクラウドコントロールプレーンが展開される領域。
 ## 3. コアコンポーネントと技術スタック
+
+### 3.1. IaC ツールチェーン
+
+| ツール | 用途 | バージョン要件 |
+| :--- | :--- | :--- |
+| Terraform | VM・ネットワークのプロビジョニング（Proxmox VE リソース管理） | >= 1.5 |
+| Terraform Provider: bpg/proxmox | Proxmox VE API との通信 | ~> 0.73 |
+| Ansible | OS初期設定・ミドルウェア構成管理 | 最新安定版 |
+
+### 3.2. Terraform ディレクトリ構成
+
+```
+terraform/
+├── environments/
+│   └── proxmox/        # Proxmox VE 環境定義（プロバイダ設定・変数定義）
+├── modules/
+│   └── vm/             # 再利用可能な VM プロビジョニングモジュール
+└── secrets/            # 機密情報（.gitignore で除外）
+    └── terraform.tfvars
+```
+
+### 3.3. Ansible ディレクトリ構成
+
+```
+ansible/
+├── ansible.cfg
+├── inventories/
+│   └── proxmox/
+│       └── hosts.yml   # Proxmox ノードインベントリ
+├── playbooks/
+├── roles/
+├── group_vars/
+├── host_vars/
+└── secrets/            # Vault パスワード等（.gitignore で除外）
+```
+
+### 3.4. Proxmox VE 接続情報
+
+| 項目 | 値 |
+| :--- | :--- |
+| APIエンドポイント | `https://192.168.11.11:8006` |
+| 認証方式 | APIトークン（`USER@REALM!TOKENID=SECRET`形式） |
+| TLS検証 | 無効（自己署名証明書のため） |
+| VMテンプレートID | `9000`（cloud-initテンプレート） |
+
+認証情報は `terraform/secrets/terraform.tfvars` に格納し、Git管理から除外する。
+
 ## 4. ネットワーク・VLAN設計の基本方針
 ## 5. 物理ノードとリソース割り当ての方針

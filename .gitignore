@@ -62,6 +62,12 @@ yarn-error.log
 *.pem
 *.key
 
+# Terraform / Ansible の機密情報格納ディレクトリ（.gitkeep のみ追跡）
+terraform/secrets/*
+!terraform/secrets/.gitkeep
+ansible/secrets/*
+!ansible/secrets/.gitkeep
+
 # =========================
 # OS & エディタの自動生成ファイル
 # =========================
