@@ -1,0 +1,84 @@
+---
+- name: Add ISC APT repository GPG key
+  get_url:
+    url: "https://dl.cloudsmith.io/public/isc/kea-2-6/gpg.key"
+    dest: /tmp/isc-kea.gpg
+    mode: "0644"
+
+- name: Dearmor ISC GPG key
+  command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/isc-kea.gpg /tmp/isc-kea.gpg
+    creates: /usr/share/keyrings/isc-kea.gpg
+
+- name: Add ISC Kea 2.6 APT repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/isc-kea.gpg] https://dl.cloudsmith.io/public/isc/kea-2-6/deb/ubuntu {{ ansible_distribution_release }} main"
+    state: present
+    filename: isc-kea-2-6
+
+- name: Install Kea packages
+  apt:
+    name: "{{ kea_packages }}"
+    state: present
+    update_cache: yes
+
+- name: Create Kea log directory
+  file:
+    path: "{{ kea_log_dir }}"
+    state: directory
+    owner: _kea
+    group: _kea
+    mode: "0755"
+
+- name: Create Kea lease directory
+  file:
+    path: "{{ kea_lease_dir }}"
+    state: directory
+    owner: _kea
+    group: _kea
+    mode: "0755"
+
+- name: Deploy kea-ctrl-agent configuration
+  template:
+    src: kea-ctrl-agent.conf.j2
+    dest: "{{ kea_config_dir }}/kea-ctrl-agent.conf"
+    owner: root
+    group: _kea
+    mode: "0640"
+  notify: restart kea-ctrl-agent
+
+- name: Deploy kea-dhcp-ddns configuration
+  template:
+    src: kea-dhcp-ddns.conf.j2
+    dest: "{{ kea_config_dir }}/kea-dhcp-ddns.conf"
+    owner: root
+    group: _kea
+    mode: "0640"
+  notify: restart kea-dhcp-ddns
+
+- name: Deploy kea-dhcp4 configuration
+  template:
+    src: kea-dhcp4.conf.j2
+    dest: "{{ kea_config_dir }}/kea-dhcp4.conf"
+    owner: root
+    group: _kea
+    mode: "0640"
+  notify: restart kea-dhcp4
+
+- name: Enable and start kea-ctrl-agent
+  systemd:
+    name: isc-kea-ctrl-agent
+    enabled: true
+    state: started
+
+- name: Enable and start kea-dhcp-ddns
+  systemd:
+    name: isc-kea-dhcp-ddns
+    enabled: true
+    state: started
+
+- name: Enable and start kea-dhcp4
+  systemd:
+    name: isc-kea-dhcp4
+    enabled: true
+    state: started

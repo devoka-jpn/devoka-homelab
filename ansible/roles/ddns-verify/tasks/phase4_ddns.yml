@@ -1,0 +1,61 @@
+---
+# TC-12/13: DHCP リース更新 → DDNS 登録確認
+- name: "TC-12: DHCP リースを更新（DDNS トリガー）"
+  become: true
+  shell: "dhclient -r && sleep 3 && dhclient"
+  changed_when: true
+
+- name: "TC-12/13: 現在のホスト名を取得"
+  command: hostname -s
+  register: client_hostname
+  changed_when: false
+
+- name: "TC-12: DDNS 正引き登録の確認（リトライ最大 5 回）"
+  command: "dig @{{ dns_primary_ip }} {{ client_hostname.stdout }}.{{ dns_domain }} A +short"
+  register: ddns_fwd
+  retries: 5
+  delay: 3
+  until: ddns_fwd.stdout != ""
+  changed_when: false
+
+- name: "TC-12: 動的登録された A レコードが解決できること"
+  assert:
+    that: ddns_fwd.stdout != ""
+    fail_msg: "TC-12 FAIL: DDNS 正引き登録が確認できない ({{ client_hostname.stdout }}.{{ dns_domain }})"
+    success_msg: "TC-12 OK: DDNS 正引き = {{ client_hostname.stdout }} -> {{ ddns_fwd.stdout }}"
+
+- name: "TC-13: PTR レコードが正しく登録されていること"
+  command: "dig @{{ dns_primary_ip }} -x {{ ddns_fwd.stdout }} +short"
+  register: ddns_ptr
+  changed_when: false
+
+- name: "TC-13: 逆引きでホスト名が返ること"
+  assert:
+    that: client_hostname.stdout in ddns_ptr.stdout
+    fail_msg: "TC-13 FAIL: DDNS 逆引き不一致 ({{ ddns_fwd.stdout }} -> {{ ddns_ptr.stdout }})"
+    success_msg: "TC-13 OK: DDNS 逆引き = {{ ddns_fwd.stdout }} -> {{ ddns_ptr.stdout }}"
+
+# TC-14: DHCP リース解放 → DNS レコード削除確認
+- name: "TC-14: DHCP リースを解放"
+  become: true
+  command: dhclient -r
+  changed_when: true
+
+- name: "TC-14: リース解放後の DNS レコード削除確認（リトライ最大 5 回）"
+  command: "dig @{{ dns_primary_ip }} {{ client_hostname.stdout }}.{{ dns_domain }} A"
+  register: ddns_del
+  retries: 5
+  delay: 3
+  until: "'NXDOMAIN' in ddns_del.stdout"
+  changed_when: false
+
+- name: "TC-14: NXDOMAIN が返ること（レコード削除済み）"
+  assert:
+    that: "'NXDOMAIN' in ddns_del.stdout"
+    fail_msg: "TC-14 FAIL: リース解放後もレコードが残存している"
+    success_msg: "TC-14 OK: レコード削除を確認（NXDOMAIN）"
+
+- name: "試験後: DHCP リースを再取得（通常状態へ復旧）"
+  become: true
+  command: dhclient
+  changed_when: true

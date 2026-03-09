@@ -1,0 +1,10 @@
+---
+# BIND9 ロール設定
+dns_role: secondary
+
+# Kea DHCP ロール設定
+kea_role: standby
+kea_server_name: server2
+
+# Cloud-init で設定された固定 IP
+expected_ip: "192.168.11.54"

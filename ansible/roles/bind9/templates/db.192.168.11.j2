@@ -1,0 +1,22 @@
+; {{ ansible_managed }}
+; 逆引きゾーン: 192.168.11.0/24
+; ※ DDNS 更新が開始されると BIND9 がこのファイルを直接管理する。
+
+$ORIGIN 11.168.192.in-addr.arpa.
+$TTL 300
+
+@   IN  SOA  hip1tk-pvdns01.{{ dns_domain }}. hostmaster.{{ dns_domain }}. (
+                {{ ansible_date_time.date | replace('-','') }}01  ; Serial
+                3600        ; Refresh
+                900         ; Retry
+                604800      ; Expire
+                300 )       ; Minimum TTL
+
+; ネームサーバ
+@   IN  NS   hip1tk-pvdns01.{{ dns_domain }}.
+@   IN  NS   hip1tk-pvdns02.{{ dns_domain }}.
+
+; --- 固定 PTR エントリ ---
+{% for entry in dns_static_entries %}
+{{ "%-8s" | format(entry.ip.split('.')[-1]) }} IN  PTR  {{ entry.name }}.{{ dns_domain }}.
+{% endfor %}

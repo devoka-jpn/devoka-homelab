@@ -1,0 +1,23 @@
+{
+  "Control-agent": {
+    "http-host": "{{ ansible_default_ipv4.address }}",
+    "http-port": 8000,
+    "control-sockets": {
+      "dhcp4": {
+        "socket-type": "unix",
+        "socket-name": "{{ kea_run_dir }}/kea4-ctrl.sock"
+      }
+    },
+    "loggers": [
+      {
+        "name": "kea-ctrl-agent",
+        "output-options": [
+          {
+            "output": "{{ kea_log_dir }}/kea-ctrl-agent.log"
+          }
+        ],
+        "severity": "INFO"
+      }
+    ]
+  }
+}

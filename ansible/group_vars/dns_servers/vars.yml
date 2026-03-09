@@ -1,0 +1,23 @@
+---
+# ネットワーク・ドメイン設定
+dns_domain: "devoka-jpn.com"
+dns_primary_ip: "192.168.11.53"
+dns_secondary_ip: "192.168.11.54"
+network_gateway: "192.168.11.1"
+network_cidr: "192.168.11.0/24"
+
+# DHCP プール
+dhcp_pool_start: "192.168.11.100"
+dhcp_pool_end: "192.168.11.200"
+dhcp_lease_time: 3600
+dhcp_renew_timer: 900
+dhcp_rebind_timer: 1800
+
+# DNS 静的エントリ（verify Playbook でも使用）
+dns_static_entries:
+  - { name: "gateway",         ip: "192.168.11.1" }
+  - { name: "hip1tk-ppprox01", ip: "192.168.11.11" }
+  - { name: "hip1tk-ppprox02", ip: "192.168.11.12" }
+  - { name: "hip1tk-ppprox03", ip: "192.168.11.13" }
+  - { name: "hip1tk-pvdns01",  ip: "192.168.11.53" }
+  - { name: "hip1tk-pvdns02",  ip: "192.168.11.54" }

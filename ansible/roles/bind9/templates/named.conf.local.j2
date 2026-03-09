@@ -1,0 +1,39 @@
+# {{ ansible_managed }}
+
+{% if dns_role == 'primary' %}
+# --- Primary: 正引きゾーン（master）---
+zone "{{ dns_domain }}" {
+    type master;
+    file "{{ bind9_dynamic_zone_dir }}/db.{{ dns_domain }}";
+    allow-update { key "ddns-key"; };
+    allow-transfer { key "transfer-key"; {{ dns_secondary_ip }}; };
+    notify yes;
+    also-notify { {{ dns_secondary_ip }}; };
+};
+
+# --- Primary: 逆引きゾーン（master）---
+zone "11.168.192.in-addr.arpa" {
+    type master;
+    file "{{ bind9_dynamic_zone_dir }}/db.192.168.11";
+    allow-update { key "ddns-key"; };
+    allow-transfer { key "transfer-key"; {{ dns_secondary_ip }}; };
+    notify yes;
+    also-notify { {{ dns_secondary_ip }}; };
+};
+{% else %}
+# --- Secondary: 正引きゾーン（slave）---
+zone "{{ dns_domain }}" {
+    type slave;
+    file "{{ bind9_cache_dir }}/db.{{ dns_domain }}";
+    masters { {{ dns_primary_ip }}; };
+    allow-notify { {{ dns_primary_ip }}; };
+};
+
+# --- Secondary: 逆引きゾーン（slave）---
+zone "11.168.192.in-addr.arpa" {
+    type slave;
+    file "{{ bind9_cache_dir }}/db.192.168.11";
+    masters { {{ dns_primary_ip }}; };
+    allow-notify { {{ dns_primary_ip }}; };
+};
+{% endif %}

@@ -1,0 +1,26 @@
+---
+# DDNS サーバ構築 Playbook
+# 実行: ansible-playbook playbooks/ddns.yml -i inventories/proxmox/hosts.yml
+#
+# 前提条件:
+#   1. ansible/secrets/vault_pass が存在すること
+#   2. ansible/group_vars/dns_servers/vault.yml が存在すること（scripts/init-vault.sh で生成）
+
+- name: "BIND9 構築（Primary → Secondary の順）"
+  hosts: dns_servers
+  serial:
+    - "hip1tk-pvdns01"
+    - "hip1tk-pvdns02"
+  roles:
+    - bind9
+
+- name: "Kea DHCP 構築（Primary → Secondary の順）"
+  hosts: dns_servers
+  serial:
+    - "hip1tk-pvdns01"
+    - "hip1tk-pvdns02"
+  roles:
+    - kea
+
+# 構築完了後に自動で受け入れ試験を実行
+- import_playbook: ddns-verify.yml

@@ -1,0 +1,28 @@
+# {{ ansible_managed }}
+
+acl "internal" {
+    {{ network_cidr }};
+    127.0.0.1;
+};
+
+options {
+    directory "{{ bind9_cache_dir }}";
+
+    # 内部ネットワークからの再帰クエリのみ受け付ける
+    recursion yes;
+    allow-recursion { internal; };
+    allow-query    { internal; };
+
+    # このサーバの IP のみでリッスン
+    listen-on { {{ ansible_default_ipv4.address }}; 127.0.0.1; };
+    listen-on-v6 { none; };
+
+    # 内部ゾーン以外はゲートウェイへフォワード（スプリットホライズン）
+    forwarders { {{ network_gateway }}; };
+    forward only;
+
+    # デフォルトでゾーン転送を拒否（ゾーン単位で上書き）
+    allow-transfer { none; };
+
+    dnssec-validation auto;
+};

@@ -1,0 +1,117 @@
+{
+  "Dhcp4": {
+    "interfaces-config": {
+      "interfaces": [ "{{ ansible_default_ipv4.interface }}" ],
+      "dhcp-socket-type": "raw"
+    },
+
+    "control-socket": {
+      "socket-type": "unix",
+      "socket-name": "{{ kea_run_dir }}/kea4-ctrl.sock"
+    },
+
+    "lease-database": {
+      "type": "memfile",
+      "persist": true,
+      "name": "{{ kea_lease_dir }}/dhcp4.leases"
+    },
+
+    "expired-leases-processing": {
+      "reclaim-timer-wait-time": 10,
+      "flush-reclaimed-timerout": 25,
+      "hold-reclaimed-time": 3600,
+      "max-reclaim-leases": 100,
+      "max-reclaim-time": 250
+    },
+
+    "renew-timer":    {{ dhcp_renew_timer }},
+    "rebind-timer":   {{ dhcp_rebind_timer }},
+    "valid-lifetime": {{ dhcp_lease_time }},
+
+    "option-data": [
+      {
+        "name": "domain-name-servers",
+        "data": "{{ dns_primary_ip }}, {{ dns_secondary_ip }}"
+      },
+      {
+        "name": "domain-name",
+        "data": "{{ dns_domain }}"
+      },
+      {
+        "name": "routers",
+        "data": "{{ network_gateway }}"
+      }
+    ],
+
+    "subnet4": [
+      {
+        "subnet": "{{ network_cidr }}",
+        "pools": [
+          {
+            "pool": "{{ dhcp_pool_start }} - {{ dhcp_pool_end }}"
+          }
+        ]
+      }
+    ],
+
+    "dhcp-ddns": {
+      "enable-updates": true,
+      "server-ip": "127.0.0.1",
+      "server-port": 53001,
+      "max-queue-size": 1024,
+      "ncr-protocol": "UDP",
+      "ncr-format": "JSON"
+    },
+
+    "ddns-qualifying-suffix": "{{ dns_domain }}",
+    "ddns-override-client-update": true,
+    "ddns-replace-client-name": "when-not-present",
+
+    "hooks-libraries": [
+      {
+        "library": "{{ kea_hooks_dir }}/libdhcp_lease_cmds.so"
+      },
+      {
+        "library": "{{ kea_hooks_dir }}/libdhcp_ha.so",
+        "parameters": {
+          "high-availability": [
+            {
+              "this-server-name": "{{ kea_server_name }}",
+              "mode": "hot-standby",
+              "heartbeat-delay": 10000,
+              "max-response-delay": 60000,
+              "max-ack-delay": 5000,
+              "max-unacked-clients": 5,
+              "peers": [
+                {
+                  "name": "server1",
+                  "url": "{{ kea_peer_primary_url }}",
+                  "role": "primary",
+                  "auto-failover": true
+                },
+                {
+                  "name": "server2",
+                  "url": "{{ kea_peer_secondary_url }}",
+                  "role": "standby",
+                  "auto-failover": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+
+    "loggers": [
+      {
+        "name": "kea-dhcp4",
+        "output-options": [
+          {
+            "output": "{{ kea_log_dir }}/kea-dhcp4.log"
+          }
+        ],
+        "severity": "INFO"
+      }
+    ]
+  }
+}

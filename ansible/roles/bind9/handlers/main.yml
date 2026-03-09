@@ -1,0 +1,10 @@
+---
+- name: restart named
+  systemd:
+    name: "{{ bind9_service }}"
+    state: restarted
+
+- name: reload named
+  systemd:
+    name: "{{ bind9_service }}"
+    state: reloaded

@@ -1,0 +1,23 @@
+---
+# DDNS 受け入れ試験 Playbook
+# 構築 Playbook（ddns.yml）から自動実行されるほか、単体でも実行可能。
+#
+# 実行:
+#   全 TC: ansible-playbook playbooks/ddns-verify.yml -i inventories/proxmox/hosts.yml
+#   特定フェーズのみ: ... --tags phase2_dns
+#
+# フェーズ 5（冗長化確認: TC-15〜17）は Primary VM の手動停止が必要なため除外。
+
+- name: "Phase 1〜3: DNS サーバ上の OS・サービス確認"
+  hosts: dns_servers
+  roles:
+    - role: ddns-verify
+      tags: always
+  tasks: []
+
+- name: "Phase 2〜4: 試験端末からの DNS・DHCP・DDNS 確認"
+  hosts: management_vms
+  roles:
+    - role: ddns-verify
+      tags: always
+  tasks: []

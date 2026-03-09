@@ -1,0 +1,59 @@
+{
+  "DhcpDdns": {
+    "ip-address": "127.0.0.1",
+    "port": 53001,
+    "dns-server-timeout": 100,
+    "ncr-protocol": "UDP",
+    "ncr-format": "JSON",
+
+    "tsig-keys": [
+      {
+        "name": "ddns-key",
+        "algorithm": "HMAC-SHA256",
+        "secret": "{{ vault_ddns_key_secret }}"
+      }
+    ],
+
+    "forward-ddns": {
+      "ddns-domains": [
+        {
+          "name": "{{ dns_domain }}.",
+          "key-name": "ddns-key",
+          "dns-servers": [
+            {
+              "ip-address": "{{ dns_primary_ip }}",
+              "port": 53
+            }
+          ]
+        }
+      ]
+    },
+
+    "reverse-ddns": {
+      "ddns-domains": [
+        {
+          "name": "11.168.192.in-addr.arpa.",
+          "key-name": "ddns-key",
+          "dns-servers": [
+            {
+              "ip-address": "{{ dns_primary_ip }}",
+              "port": 53
+            }
+          ]
+        }
+      ]
+    },
+
+    "loggers": [
+      {
+        "name": "kea-dhcp-ddns",
+        "output-options": [
+          {
+            "output": "{{ kea_log_dir }}/kea-dhcp-ddns.log"
+          }
+        ],
+        "severity": "INFO"
+      }
+    ]
+  }
+}
