@@ -62,10 +62,11 @@ vault_transfer_key_secret: "${TRANSFER_KEY_SECRET}"
 EOF
 
 # --- Ansible Vault で暗号化して保存 ---
-ansible-vault encrypt "${TMPFILE}" \
-  --vault-password-file="${VAULT_PASS_FILE}" \
-  --output="${VAULT_FILE}"
+# ansible.cfg に vault_password_file が設定されているため --vault-password-file は渡さない。
+# ansible.cfg が読み込まれるよう、ansible ディレクトリへ移動してから実行する。
+cd "${ANSIBLE_DIR}"
+ansible-vault encrypt "${TMPFILE}" --output="${VAULT_FILE}"
 
 echo "[INFO] vault.yml を作成しました: ${VAULT_FILE}"
 echo "[INFO] 内容を確認するには以下を実行してください:"
-echo "    ansible-vault view ${VAULT_FILE} --vault-password-file=${VAULT_PASS_FILE}"
+echo "    cd ${ANSIBLE_DIR} && ansible-vault view ${VAULT_FILE}"
