@@ -18,7 +18,7 @@
 
     "expired-leases-processing": {
       "reclaim-timer-wait-time": 10,
-      "flush-reclaimed-timerout": 25,
+      "flush-reclaimed-timer-wait-time": 25,
       "hold-reclaimed-time": 3600,
       "max-reclaim-leases": 100,
       "max-reclaim-time": 250
@@ -45,6 +45,7 @@
 
     "subnet4": [
       {
+        "id": 1,
         "subnet": "{{ network_cidr }}",
         "pools": [
           {

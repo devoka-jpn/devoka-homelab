@@ -1,12 +1,12 @@
 ---
 - name: restart kea-dhcp4
   systemd:
-    name: isc-kea-dhcp4
+    name: isc-kea-dhcp4-server
     state: restarted
 
 - name: restart kea-dhcp-ddns
   systemd:
-    name: isc-kea-dhcp-ddns
+    name: isc-kea-dhcp-ddns-server
     state: restarted
 
 - name: restart kea-ctrl-agent

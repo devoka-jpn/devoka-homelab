@@ -6,17 +6,14 @@
 #   全 TC: ansible-playbook playbooks/ddns-verify.yml -i inventories/proxmox/hosts.yml
 #   特定フェーズのみ: ... --tags phase2_dns
 #
-# フェーズ 5（冗長化確認: TC-15〜17）は Primary VM の手動停止が必要なため除外。
+# 自動化対象: TC-01〜09, TC-11（dns_servers 上で実行）
+# 自動化対象外:
+#   - TC-10（DHCP DNS 配布確認）: DHCP クライアント端末（Zabbix Server）から実施
+#   - TC-12〜14（DDNS 動作確認）: DHCP クライアント端末（Zabbix Server）から実施
+#   - TC-15〜17（冗長化確認）: Primary VM の手動停止が必要なため手動実施
 
-- name: "Phase 1〜3: DNS サーバ上の OS・サービス確認"
+- name: "Phase 1〜3: DNS サーバ上の OS・サービス・DHCP 確認"
   hosts: dns_servers
-  roles:
-    - role: ddns-verify
-      tags: always
-  tasks: []
-
-- name: "Phase 2〜4: 試験端末からの DNS・DHCP・DDNS 確認"
-  hosts: management_vms
   roles:
     - role: ddns-verify
       tags: always

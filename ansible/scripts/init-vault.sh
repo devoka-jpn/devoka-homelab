@@ -21,7 +21,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ANSIBLE_DIR="${SCRIPT_DIR}/.."
 VAULT_PASS_FILE="${ANSIBLE_DIR}/secrets/vault_pass"
-VAULT_FILE="${ANSIBLE_DIR}/group_vars/dns_servers/vault.yml"
+VAULT_FILE="${ANSIBLE_DIR}/inventories/proxmox/group_vars/dns_servers/vault.yml"
 
 # --- 前提確認 ---
 if [ ! -f "${VAULT_PASS_FILE}" ]; then

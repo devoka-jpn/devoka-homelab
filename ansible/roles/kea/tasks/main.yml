@@ -73,12 +73,12 @@
 
 - name: Enable and start kea-dhcp-ddns
   systemd:
-    name: isc-kea-dhcp-ddns
+    name: isc-kea-dhcp-ddns-server
     enabled: true
     state: started
 
 - name: Enable and start kea-dhcp4
   systemd:
-    name: isc-kea-dhcp4
+    name: isc-kea-dhcp4-server
     enabled: true
     state: started

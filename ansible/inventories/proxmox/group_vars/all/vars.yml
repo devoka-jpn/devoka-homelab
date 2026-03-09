@@ -1,5 +1,5 @@
 ---
-# ネットワーク・ドメイン設定
+# ネットワーク・ドメイン設定（全ホスト共通）
 dns_domain: "devoka-jpn.com"
 dns_primary_ip: "192.168.11.53"
 dns_secondary_ip: "192.168.11.54"

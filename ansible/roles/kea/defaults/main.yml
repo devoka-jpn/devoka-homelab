@@ -8,11 +8,11 @@ kea_packages:
 kea_config_dir: /etc/kea
 kea_log_dir: /var/log/kea
 kea_lease_dir: /var/lib/kea
-kea_run_dir: /run/kea
+kea_run_dir: /var/run/kea
 
-# HA ピアの URL テンプレート
-kea_peer_primary_url: "http://{{ dns_primary_ip }}:8000/"
-kea_peer_secondary_url: "http://{{ dns_secondary_ip }}:8000/"
+# HA ピアの URL テンプレート（kea-ctrl-agent は 8000、HA 通信は 8080 で競合回避）
+kea_peer_primary_url: "http://{{ dns_primary_ip }}:8080/"
+kea_peer_secondary_url: "http://{{ dns_secondary_ip }}:8080/"
 
 # Kea フック共有ライブラリのディレクトリ
 # Ubuntu/x86_64 の標準パス（バージョンや OS により異なる場合は上書きすること）

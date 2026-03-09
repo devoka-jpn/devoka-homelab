@@ -57,7 +57,7 @@
 - name: "TC-08: ゾーン転送完了ログ確認"
   delegate_to: hip1tk-pvdns01
   become: true
-  shell: "journalctl -u named --no-pager | grep -c 'Transfer completed' || echo 0"
+  shell: "journalctl -u named --no-pager | grep -c 'AXFR ended' || echo 0"
   register: transfer_log
   changed_when: false
 

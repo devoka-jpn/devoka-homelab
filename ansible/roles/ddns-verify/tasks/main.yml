@@ -1,4 +1,14 @@
 ---
+- name: "前提: 試験ツールのインストール（dns_servers のみ）"
+  become: true
+  apt:
+    name:
+      - bind9-dnsutils
+      - isc-dhcp-client
+    state: present
+  when: inventory_hostname in groups['dns_servers']
+  tags: always
+
 - name: "Phase 1: VM / OS 確認"
   import_tasks: phase1_os.yml
   tags: phase1_os
