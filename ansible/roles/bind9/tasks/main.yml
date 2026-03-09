@@ -1,0 +1,78 @@
+---
+- name: Install BIND9 packages
+  apt:
+    name: "{{ bind9_packages }}"
+    state: present
+    update_cache: yes
+
+- name: Create dynamic zone directory
+  file:
+    path: "{{ bind9_dynamic_zone_dir }}"
+    state: directory
+    owner: "{{ bind9_user }}"
+    group: "{{ bind9_user }}"
+    mode: "0775"
+
+- name: Deploy TSIG key configuration
+  template:
+    src: named.conf.tsig.j2
+    dest: "{{ bind9_config_dir }}/named.conf.tsig"
+    owner: root
+    group: "{{ bind9_user }}"
+    mode: "0640"
+  notify: restart named
+
+- name: Include TSIG config in named.conf
+  lineinfile:
+    path: "{{ bind9_config_dir }}/named.conf"
+    line: 'include "{{ bind9_config_dir }}/named.conf.tsig";'
+    insertbefore: '^include.*named\.conf\.options'
+    state: present
+  notify: restart named
+
+- name: Deploy named.conf.options
+  template:
+    src: named.conf.options.j2
+    dest: "{{ bind9_config_dir }}/named.conf.options"
+    owner: root
+    group: "{{ bind9_user }}"
+    mode: "0644"
+    validate: named-checkconf %s
+  notify: restart named
+
+- name: Deploy named.conf.local
+  template:
+    src: named.conf.local.j2
+    dest: "{{ bind9_config_dir }}/named.conf.local"
+    owner: root
+    group: "{{ bind9_user }}"
+    mode: "0644"
+  notify: restart named
+
+- name: Deploy initial forward zone file (Primary only, skip if already exists)
+  template:
+    src: db.devoka-jpn.com.j2
+    dest: "{{ bind9_dynamic_zone_dir }}/db.{{ dns_domain }}"
+    owner: "{{ bind9_user }}"
+    group: "{{ bind9_user }}"
+    mode: "0644"
+    force: false
+  when: dns_role == 'primary'
+  notify: reload named
+
+- name: Deploy initial reverse zone file (Primary only, skip if already exists)
+  template:
+    src: db.192.168.11.j2
+    dest: "{{ bind9_dynamic_zone_dir }}/db.192.168.11"
+    owner: "{{ bind9_user }}"
+    group: "{{ bind9_user }}"
+    mode: "0644"
+    force: false
+  when: dns_role == 'primary'
+  notify: reload named
+
+- name: Enable and start named
+  systemd:
+    name: "{{ bind9_service }}"
+    enabled: true
+    state: started

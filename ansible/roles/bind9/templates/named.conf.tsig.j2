@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# TSIG キー定義（Ansible Vault で管理）
+
+key "ddns-key" {
+    algorithm hmac-sha256;
+    secret "{{ vault_ddns_key_secret }}";
+};
+
+key "transfer-key" {
+    algorithm hmac-sha256;
+    secret "{{ vault_transfer_key_secret }}";
+};

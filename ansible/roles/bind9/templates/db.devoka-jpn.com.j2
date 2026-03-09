@@ -1,0 +1,23 @@
+; {{ ansible_managed }}
+; 正引きゾーン: {{ dns_domain }}
+; ※ DDNS 更新が開始されると BIND9 がこのファイルを直接管理する。
+;    以降の変更はゾーンファイルへの直接編集ではなく nsupdate で行うこと。
+
+$ORIGIN {{ dns_domain }}.
+$TTL 300
+
+@   IN  SOA  hip1tk-pvdns01.{{ dns_domain }}. hostmaster.{{ dns_domain }}. (
+                {{ ansible_date_time.date | replace('-','') }}01  ; Serial
+                3600        ; Refresh
+                900         ; Retry
+                604800      ; Expire
+                300 )       ; Minimum TTL
+
+; ネームサーバ
+@   IN  NS   hip1tk-pvdns01.{{ dns_domain }}.
+@   IN  NS   hip1tk-pvdns02.{{ dns_domain }}.
+
+; --- 固定 IP エントリ ---
+{% for entry in dns_static_entries %}
+{{ "%-24s" | format(entry.name) }} IN  A    {{ entry.ip }}
+{% endfor %}

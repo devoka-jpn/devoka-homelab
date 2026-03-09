@@ -1,0 +1,3 @@
+---
+# dns_servers グループ固有の設定
+# 共通ネットワーク変数は group_vars/all/vars.yml を参照

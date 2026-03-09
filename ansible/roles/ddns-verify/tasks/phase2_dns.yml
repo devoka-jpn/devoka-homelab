@@ -1,0 +1,68 @@
+---
+# TC-04: 固定エントリ正引き解決（Primary）
+- name: "TC-04: 正引き解決（Primary 192.168.11.53）"
+  command: "dig @{{ dns_primary_ip }} {{ item.name }}.{{ dns_domain }} A +short"
+  register: dig_primary
+  loop: "{{ dns_static_entries }}"
+  changed_when: false
+
+- name: "TC-04: 正引き結果の確認"
+  assert:
+    that: item.stdout == item.item.ip
+    fail_msg: "TC-04 FAIL: {{ item.item.name }} -> {{ item.stdout }} (期待: {{ item.item.ip }})"
+    success_msg: "TC-04 OK: {{ item.item.name }} -> {{ item.stdout }}"
+  loop: "{{ dig_primary.results }}"
+
+# TC-05: 逆引き解決（Primary）
+- name: "TC-05: 逆引き解決（Primary）"
+  command: "dig @{{ dns_primary_ip }} -x {{ item.ip }} +short"
+  register: ptr_primary
+  loop: "{{ dns_static_entries }}"
+  changed_when: false
+
+- name: "TC-05: 逆引き結果の確認"
+  assert:
+    that: item.stdout == item.item.name + '.' + dns_domain + '.'
+    fail_msg: "TC-05 FAIL: {{ item.item.ip }} -> {{ item.stdout }}"
+    success_msg: "TC-05 OK: {{ item.item.ip }} -> {{ item.stdout }}"
+  loop: "{{ ptr_primary.results }}"
+
+# TC-06: 外部ドメインへのフォワード確認
+- name: "TC-06: 外部ドメイン解決（google.com）"
+  command: "dig @{{ dns_primary_ip }} google.com A +short"
+  register: fwd_result
+  changed_when: false
+
+- name: "TC-06: フォワードで IP が返ること"
+  assert:
+    that: fwd_result.stdout != ""
+    fail_msg: "TC-06 FAIL: 外部フォワード失敗（結果なし）"
+    success_msg: "TC-06 OK: 外部フォワード成功"
+
+# TC-07: Secondary によるゾーン解決
+- name: "TC-07: 正引き解決（Secondary 192.168.11.54）"
+  command: "dig @{{ dns_secondary_ip }} {{ item.name }}.{{ dns_domain }} A +short"
+  register: dig_secondary
+  loop: "{{ dns_static_entries }}"
+  changed_when: false
+
+- name: "TC-07: Secondary の解決結果確認"
+  assert:
+    that: item.stdout == item.item.ip
+    fail_msg: "TC-07 FAIL: Secondary で {{ item.item.name }} -> {{ item.stdout }} (期待: {{ item.item.ip }})"
+    success_msg: "TC-07 OK: Secondary で {{ item.item.name }} -> {{ item.stdout }}"
+  loop: "{{ dig_secondary.results }}"
+
+# TC-08: ゾーン転送完了ログ確認（Primary で実行）
+- name: "TC-08: ゾーン転送完了ログ確認"
+  delegate_to: hip1tk-pvdns01
+  become: true
+  shell: "journalctl -u named --no-pager | grep -c 'AXFR ended' || echo 0"
+  register: transfer_log
+  changed_when: false
+
+- name: "TC-08: ゾーン転送完了ログが存在すること"
+  assert:
+    that: transfer_log.stdout | int > 0
+    fail_msg: "TC-08 FAIL: ゾーン転送完了ログが存在しない"
+    success_msg: "TC-08 OK: ゾーン転送完了確認"

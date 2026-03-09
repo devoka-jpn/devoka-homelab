@@ -1,0 +1,57 @@
+---
+# TC-09/11: Kea REST API（Primary）からリース統計と HA 状態を取得
+- name: "TC-09: Kea リース統計取得（Primary）"
+  uri:
+    url: "http://{{ dns_primary_ip }}:8000/"
+    method: POST
+    body_format: json
+    body:
+      command: "stat-lease4-get"
+      service: ["dhcp4"]
+    return_content: true
+  register: lease_stats
+
+- name: "TC-09: REST API からリース統計が取得できること"
+  assert:
+    that: lease_stats.status == 200
+    fail_msg: "TC-09 FAIL: Kea REST API に到達できない"
+    success_msg: "TC-09 OK: Kea REST API 応答確認"
+
+# TC-10: DHCP Option 6（DNS サーバ）の配布確認（DHCP クライアント端末のみ実施）
+- name: "TC-10: resolveconf からの DNS サーバ確認"
+  command: resolvectl status
+  register: resolv_status
+  changed_when: false
+  when: inventory_hostname not in groups['dns_servers']
+
+- name: "TC-10: Primary DNS が配布されていること"
+  assert:
+    that: dns_primary_ip in resolv_status.stdout
+    fail_msg: "TC-10 FAIL: DNS サーバ {{ dns_primary_ip }} が配布されていない"
+    success_msg: "TC-10 OK: Primary DNS {{ dns_primary_ip }} の配布を確認"
+  when: inventory_hostname not in groups['dns_servers']
+
+- name: "TC-10: Secondary DNS が配布されていること"
+  assert:
+    that: dns_secondary_ip in resolv_status.stdout
+    fail_msg: "TC-10 FAIL: DNS サーバ {{ dns_secondary_ip }} が配布されていない"
+    success_msg: "TC-10 OK: Secondary DNS {{ dns_secondary_ip }} の配布を確認"
+  when: inventory_hostname not in groups['dns_servers']
+
+# TC-11: Kea HA 状態確認
+- name: "TC-11: Kea HA ステータス取得"
+  uri:
+    url: "http://{{ dns_primary_ip }}:8000/"
+    method: POST
+    body_format: json
+    body:
+      command: "ha-heartbeat"
+      service: ["dhcp4"]
+    return_content: true
+  register: ha_status
+
+- name: "TC-11: Kea HA 状態が hot-standby であること"
+  assert:
+    that: ha_status.json[0].arguments.state == "hot-standby"
+    fail_msg: "TC-11 FAIL: Kea HA 状態が異常 ({{ ha_status.json[0].arguments.state }})"
+    success_msg: "TC-11 OK: Kea HA 状態 = {{ ha_status.json[0].arguments.state }}"

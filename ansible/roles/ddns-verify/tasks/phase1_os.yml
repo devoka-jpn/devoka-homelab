@@ -1,0 +1,39 @@
+---
+# TC-01: SSH 接続確認（Ansible の到達確認で代替）
+- name: "TC-01: ping 確認"
+  ping:
+
+# TC-02: ホスト名確認
+- name: "TC-02: ホスト名確認"
+  assert:
+    that: ansible_hostname == inventory_hostname
+    fail_msg: "ホスト名が不一致: 実際={{ ansible_hostname }}, 期待={{ inventory_hostname }}"
+    success_msg: "TC-02 OK: ホスト名={{ ansible_hostname }}"
+
+# TC-02: IP アドレス確認（host_vars に expected_ip が定義されているホストのみ）
+- name: "TC-02: IP アドレス確認"
+  assert:
+    that: ansible_default_ipv4.address == expected_ip
+    fail_msg: "IP アドレスが不一致: 実際={{ ansible_default_ipv4.address }}, 期待={{ expected_ip }}"
+    success_msg: "TC-02 OK: IP={{ ansible_default_ipv4.address }}"
+  when: expected_ip is defined
+
+# TC-03: 必須サービスの起動確認（dns_servers のみ）
+- name: "TC-03: サービス状態取得"
+  systemd:
+    name: "{{ item }}"
+  register: svc_status
+  loop:
+    - named
+    - isc-kea-dhcp4-server
+    - isc-kea-dhcp-ddns-server
+    - isc-kea-ctrl-agent
+  when: inventory_hostname in groups['dns_servers']
+
+- name: "TC-03: サービスが active であること"
+  assert:
+    that: item.status.ActiveState == "active"
+    fail_msg: "TC-03 FAIL: {{ item.item }} が active でない (状態={{ item.status.ActiveState }})"
+    success_msg: "TC-03 OK: {{ item.item }} が active"
+  loop: "{{ svc_status.results }}"
+  when: inventory_hostname in groups['dns_servers']
