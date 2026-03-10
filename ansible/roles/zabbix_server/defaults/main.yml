@@ -1,0 +1,15 @@
+---
+zabbix_version: "7.0"
+zabbix_server_package: "zabbix-server-pgsql"
+zabbix_agent2_package: "zabbix-agent2"
+zabbix_server_port: 10051
+zabbix_db_host: "192.168.11.200"  # HAProxy VIP
+zabbix_db_port: 5432
+zabbix_db_name: "zabbix"
+zabbix_db_user: "zabbix"
+# zabbix_db_password: vault に定義
+zabbix_ha_failover_delay: "60s"
+zabbix_cache_size: "64M"
+zabbix_history_cache_size: "32M"
+zabbix_trend_cache_size: "8M"
+zabbix_value_cache_size: "32M"

@@ -1,0 +1,28 @@
+---
+# ─── PostgreSQL + TimescaleDB + Patroni 設定変数 ─────────────────────────────
+# 機密情報 (zabbix_db_password, patroni_replication_password) は
+# ansible/secrets/zabbix_vault.yml に Ansible Vault で暗号化して管理すること。
+
+postgresql_version: "16"
+patroni_cluster_name: "zabbix-pg-cluster"
+patroni_rest_api_port: 8008
+postgresql_port: 5432
+
+zabbix_db_name: "zabbix"
+zabbix_db_user: "zabbix"
+# zabbix_db_password: ansible/secrets/zabbix_vault.yml で定義
+
+patroni_replication_user: "replicator"
+# patroni_replication_password: ansible/secrets/zabbix_vault.yml で定義
+
+postgresql_data_dir: "/var/lib/postgresql/16/main"
+postgresql_config_dir: "/etc/postgresql/16/main"
+
+# TimescaleDB 圧縮ポリシー（日数）
+timescaledb_compress_after_history_days: 7
+timescaledb_compress_after_trends_days: 90
+
+# etcd エンドポイント（LB x2 + SV01 の 3 ノード）
+# 実行時に ansible_default_ipv4.address で解決される
+etcd_endpoints: >-
+  http://{{ hostvars['hip1tk-pvzbxlb01']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxlb01.devoka-jpn.com') }}:2379,http://{{ hostvars['hip1tk-pvzbxlb02']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxlb02.devoka-jpn.com') }}:2379,http://{{ hostvars['hip1tk-pvzbxsv01']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxsv01.devoka-jpn.com') }}:2379

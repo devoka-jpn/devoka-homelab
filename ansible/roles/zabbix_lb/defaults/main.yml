@@ -1,0 +1,14 @@
+---
+# HAProxy + Keepalived + etcd 設定変数
+haproxy_version: "2.8"
+keepalived_vip: "192.168.11.200"
+keepalived_interface: "eth0"
+keepalived_vrid: 51
+keepalived_auth_pass: "zabbix_ha"  # vaultで上書き推奨
+haproxy_stats_port: 8404
+haproxy_stats_user: "admin"
+# haproxy_stats_password: vault に定義
+etcd_version: "3.5"
+etcd_cluster_name: "zabbix-etcd"
+etcd_client_port: 2379
+etcd_peer_port: 2380

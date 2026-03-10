@@ -20,13 +20,15 @@ variable "template_vm_id" {
 }
 
 variable "ip_address" {
-  description = "VM に割り当てる固定 IP アドレス（CIDR 表記、例: 192.168.11.53/24）"
+  description = "VM に割り当てる IP アドレス（CIDR 表記: '192.168.11.53/24' または DHCP: 'dhcp'）"
   type        = string
+  default     = "dhcp"
 }
 
 variable "gateway" {
-  description = "デフォルトゲートウェイ IP アドレス"
+  description = "デフォルトゲートウェイ IP アドレス（DHCP 使用時は null）"
   type        = string
+  default     = null
 }
 
 variable "username" {

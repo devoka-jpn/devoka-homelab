@@ -1,0 +1,30 @@
+---
+- name: restart nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+  become: true
+
+- name: reload nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+  become: true
+
+- name: restart php8.2-fpm
+  ansible.builtin.systemd:
+    name: php8.2-fpm
+    state: restarted
+  become: true
+
+- name: reload php8.2-fpm
+  ansible.builtin.systemd:
+    name: php8.2-fpm
+    state: reloaded
+  become: true
+
+- name: restart zabbix-agent2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    state: restarted
+  become: true

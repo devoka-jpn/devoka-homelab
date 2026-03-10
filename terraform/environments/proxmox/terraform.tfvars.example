@@ -8,11 +8,24 @@ proxmox_insecure  = true
 # Proxmox ノード名（Proxmox Web UI のノード表示名と一致させること）
 # proxmox_node_name = "hip1tk-ppprox01"
 
+# ─── DNS VM パスワード ───────────────────────────────
 # VM ユーザ設定（Cloud-init）
 # vm_username      = "bind-user"  # デフォルト値あり。変更する場合のみ記載。
 hip1tk_pvdns01_password = "your-secure-password-for-hip1tk-pvdns01"
 hip1tk_pvdns02_password = "your-secure-password-for-hip1tk-pvdns02"
 
+# ─── Zabbix VM パスワード ────────────────────────────
+# zabbix_vm_username = "zabbix-user"  # デフォルト値あり。変更する場合のみ記載。
+zabbix_lb01_password = "your-secure-password-for-hip1tk-pvzbxlb01"
+zabbix_lb02_password = "your-secure-password-for-hip1tk-pvzbxlb02"
+zabbix_sv01_password = "your-secure-password-for-hip1tk-pvzbxsv01"
+zabbix_sv02_password = "your-secure-password-for-hip1tk-pvzbxsv02"
+zabbix_fe01_password = "your-secure-password-for-hip1tk-pvzbxfe01"
+zabbix_fe02_password = "your-secure-password-for-hip1tk-pvzbxfe02"
+zabbix_db01_password = "your-secure-password-for-hip1tk-pvzbxdb01"
+zabbix_db02_password = "your-secure-password-for-hip1tk-pvzbxdb02"
+
+# ─── SSH 公開鍵 ──────────────────────────────────────
 # hip1tk-pvdesk01 の SSH 公開鍵
 # 取得方法: hip1tk-pvdesk01 上で `cat ~/.ssh/id_ed25519.pub` を実行してコピーする
-vm_ssh_public_key  = "ssh-ed25519 AAAA... bind-user@hip1tk-pvdesk01"
+vm_ssh_public_key  = "ssh-ed25519 AAAA... zabbix-user@hip1tk-pvdesk01"

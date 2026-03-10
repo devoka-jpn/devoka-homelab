@@ -1,0 +1,135 @@
+---
+# etcd インストール・設定タスク
+# このファイルは zabbix_lb/tasks/main.yml および
+# Playbook の tasks_from: etcd から include される。
+
+# etcd バイナリのダウンロード・インストール
+- name: Check if etcd binary exists
+  ansible.builtin.stat:
+    path: /usr/local/bin/etcd
+  register: etcd_binary
+
+- name: Download etcd archive
+  ansible.builtin.get_url:
+    url: "https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/etcd-v{{ etcd_version }}-linux-amd64.tar.gz"
+    mode: "0644"
+  become: true
+  when: not etcd_binary.stat.exists
+
+- name: Extract etcd archive
+  ansible.builtin.unarchive:
+    src: "/tmp/etcd-v{{ etcd_version }}-linux-amd64.tar.gz"
+    dest: /tmp/
+    remote_src: true
+  become: true
+  when: not etcd_binary.stat.exists
+
+- name: Install etcd binary
+  ansible.builtin.copy:
+    src: "/tmp/etcd-v{{ etcd_version }}-linux-amd64/etcd"
+    dest: /usr/local/bin/etcd
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  become: true
+  when: not etcd_binary.stat.exists
+
+- name: Install etcdctl binary
+  ansible.builtin.copy:
+    src: "/tmp/etcd-v{{ etcd_version }}-linux-amd64/etcdctl"
+    dest: /usr/local/bin/etcdctl
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  become: true
+  when: not etcd_binary.stat.exists
+
+# etcd ユーザ・グループ作成
+- name: Create etcd group
+  ansible.builtin.group:
+    name: etcd
+    system: true
+    state: present
+  become: true
+
+- name: Create etcd user
+  ansible.builtin.user:
+    name: etcd
+    group: etcd
+    system: true
+    shell: /sbin/nologin
+    home: /var/lib/etcd
+    create_home: false
+    state: present
+  become: true
+
+# ディレクトリ作成
+- name: Create /etc/etcd directory
+  ansible.builtin.file:
+    path: /etc/etcd
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: "0750"
+  become: true
+
+- name: Create /var/lib/etcd directory
+  ansible.builtin.file:
+    path: /var/lib/etcd
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: "0700"
+  become: true
+
+# 設定ファイル配置
+- name: Deploy etcd environment file
+  ansible.builtin.template:
+    src: etcd.env.j2
+    dest: /etc/etcd/etcd.env
+    owner: etcd
+    group: etcd
+    mode: "0640"
+  become: true
+  notify: restart etcd
+
+- name: Deploy etcd systemd service unit
+  ansible.builtin.template:
+    src: etcd.service.j2
+    dest: /etc/systemd/system/etcd.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - systemd daemon-reload
+    - restart etcd
+
+- name: Force systemd daemon-reload if service file changed
+  ansible.builtin.meta: flush_handlers
+
+# etcd サービス有効化・起動
+- name: Enable and start etcd service
+  ansible.builtin.systemd:
+    name: etcd
+    enabled: true
+    state: started
+  become: true
+
+# ufw: etcd ポート許可
+- name: Allow etcd client port (2379/tcp) via ufw
+  community.general.ufw:
+    rule: allow
+    port: "2379"
+    proto: tcp
+  become: true
+
+- name: Allow etcd peer port (2380/tcp) via ufw
+  community.general.ufw:
+    rule: allow
+    port: "2380"
+    proto: tcp
+  become: true

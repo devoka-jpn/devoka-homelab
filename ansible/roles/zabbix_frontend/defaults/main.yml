@@ -1,0 +1,20 @@
+---
+zabbix_version: "7.0"
+zabbix_frontend_package: "zabbix-frontend-php"
+nginx_package: "nginx"
+php_fpm_package: "php8.2-fpm"
+zabbix_frontend_port: 8080
+zabbix_db_host: "192.168.11.200"  # HAProxy VIP
+zabbix_db_port: 5432
+zabbix_db_name: "zabbix"
+zabbix_db_user: "zabbix"
+# zabbix_db_password: vault に定義
+zabbix_server_vip: "192.168.11.200"
+zabbix_server_port: 10051
+zabbix_server_name: "Devoka Homelab Zabbix"
+php_max_execution_time: 300
+php_memory_limit: "128M"
+php_post_max_size: "16M"
+php_upload_max_filesize: "2M"
+php_max_input_time: 300
+php_date_timezone: "Asia/Tokyo"

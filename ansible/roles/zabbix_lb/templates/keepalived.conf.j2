@@ -1,0 +1,31 @@
+vrrp_script chk_haproxy {
+    script "/usr/bin/killall -0 haproxy"
+    interval 2
+    weight 2
+}
+
+vrrp_instance VI_ZABBIX {
+{% if 'pvzbxlb01' in inventory_hostname %}
+    state MASTER
+    priority 110
+{% else %}
+    state BACKUP
+    priority 100
+{% endif %}
+    interface {{ keepalived_interface }}
+    virtual_router_id {{ keepalived_vrid }}
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ keepalived_auth_pass }}
+    }
+
+    virtual_ipaddress {
+        {{ keepalived_vip }}/24
+    }
+
+    track_script {
+        chk_haproxy
+    }
+}

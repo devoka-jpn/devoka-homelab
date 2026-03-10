@@ -33,6 +33,72 @@ variable "vm_username" {
   default     = "bind-user"
 }
 
+# ───────────────────────────────────────────────
+# Zabbix VM 共通設定
+# ───────────────────────────────────────────────
+
+variable "zabbix_vm_username" {
+  description = "Zabbix 系 VM の Cloud-init OS ユーザ名"
+  type        = string
+  default     = "zabbix-user"
+}
+
+# ───────────────────────────────────────────────
+# Zabbix VM パスワード（terraform/secrets/terraform.tfvars で管理）
+# ───────────────────────────────────────────────
+
+variable "zabbix_lb01_password" {
+  description = "hip1tk-pvzbxlb01 の Cloud-init パスワード"
+  type        = string
+  sensitive   = true
+}
+
+variable "zabbix_lb02_password" {
+  description = "hip1tk-pvzbxlb02 の Cloud-init パスワード"
+  type        = string
+  sensitive   = true
+}
+
+variable "zabbix_sv01_password" {
+  description = "hip1tk-pvzbxsv01 の Cloud-init パスワード"
+  type        = string
+  sensitive   = true
+}
+
+variable "zabbix_sv02_password" {
+  description = "hip1tk-pvzbxsv02 の Cloud-init パスワード"
+  type        = string
+  sensitive   = true
+}
+
+variable "zabbix_fe01_password" {
+  description = "hip1tk-pvzbxfe01 の Cloud-init パスワード"
+  type        = string
+  sensitive   = true
+}
+
+variable "zabbix_fe02_password" {
+  description = "hip1tk-pvzbxfe02 の Cloud-init パスワード"
+  type        = string
+  sensitive   = true
+}
+
+variable "zabbix_db01_password" {
+  description = "hip1tk-pvzbxdb01 の Cloud-init パスワード"
+  type        = string
+  sensitive   = true
+}
+
+variable "zabbix_db02_password" {
+  description = "hip1tk-pvzbxdb02 の Cloud-init パスワード"
+  type        = string
+  sensitive   = true
+}
+
+# ───────────────────────────────────────────────
+# DNS VM パスワード（既存）
+# ───────────────────────────────────────────────
+
 variable "hip1tk_pvdns01_password" {
   description = "hip1tk-pvdns01 の Cloud-init パスワード（terraform/secrets/terraform.tfvars で管理）"
   type        = string

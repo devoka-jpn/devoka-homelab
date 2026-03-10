@@ -1,0 +1,11 @@
+# Zabbix Agent2 configuration file
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+LogFile=/var/log/zabbix/zabbix_agent2.log
+LogFileSize=100
+PidFile=/run/zabbix/zabbix_agent2.pid
+SocketDir=/run/zabbix
+
+Server={{ zabbix_server_addresses }}
+ServerActive={{ zabbix_server_addresses }}
+Hostname={{ inventory_hostname }}
