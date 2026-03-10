@@ -1,0 +1,226 @@
+---
+# 1. PostgreSQL APT リポジトリ追加（postgresql.org 公式）
+- name: Add PostgreSQL APT repository GPG key
+  ansible.builtin.get_url:
+    url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
+    dest: /tmp/postgresql.asc
+    mode: "0644"
+  become: true
+
+- name: Dearmor PostgreSQL GPG key
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/postgresql.gpg /tmp/postgresql.asc
+    creates: /usr/share/keyrings/postgresql.gpg
+  become: true
+
+- name: Add PostgreSQL APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+    state: present
+    filename: pgdg
+  become: true
+
+# 2. TimescaleDB APT リポジトリ追加
+- name: Add TimescaleDB APT repository GPG key
+  ansible.builtin.get_url:
+    url: "https://packagecloud.io/timescale/timescaledb/gpgkey"
+    dest: /tmp/timescaledb.asc
+    mode: "0644"
+  become: true
+
+- name: Dearmor TimescaleDB GPG key
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/timescaledb.gpg /tmp/timescaledb.asc
+    creates: /usr/share/keyrings/timescaledb.gpg
+  become: true
+
+- name: Add TimescaleDB APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/timescaledb.gpg] https://packagecloud.io/timescale/timescaledb/ubuntu/ {{ ansible_distribution_release }} main"
+    state: present
+    filename: timescaledb
+  become: true
+
+# 3. パッケージインストール
+- name: Install PostgreSQL, TimescaleDB, Patroni packages
+  ansible.builtin.apt:
+    name:
+      - "postgresql-{{ postgresql_version }}"
+      - "timescaledb-2-postgresql-{{ postgresql_version }}"
+      - python3-psycopg2
+      - patroni
+      - python3-etcd3
+    state: present
+    update_cache: true
+  become: true
+
+# 4. TimescaleDB tuning 自動設定（db01 のみ）
+- name: Run timescaledb-tune on db01
+  ansible.builtin.command:
+    cmd: timescaledb-tune --quiet --yes
+  become: true
+  when: "'pvzbxdb01' in inventory_hostname"
+  changed_when: true
+
+# 5. patroni.yml をテンプレートから配置
+- name: Create /etc/patroni directory
+  ansible.builtin.file:
+    path: /etc/patroni
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+  become: true
+
+- name: Deploy patroni.yml from template
+  ansible.builtin.template:
+    src: patroni.yml.j2
+    dest: /etc/patroni/patroni.yml
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  become: true
+  notify: restart patroni
+
+# 6. Patroni systemd サービス有効化・起動
+- name: Enable and start Patroni service
+  ansible.builtin.systemd:
+    name: patroni
+    enabled: true
+    state: started
+  become: true
+
+# 7. db01 でのみ: Zabbix DB/ユーザ作成
+- name: Create Zabbix database user on db01
+  community.postgresql.postgresql_user:
+    name: "{{ zabbix_db_user }}"
+    password: "{{ zabbix_db_password }}"
+    state: present
+    login_user: postgres
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ postgresql_port }}"
+  become: true
+  become_user: postgres
+  when: "'pvzbxdb01' in inventory_hostname"
+
+- name: Create Zabbix database on db01
+  community.postgresql.postgresql_db:
+    name: "{{ zabbix_db_name }}"
+    owner: "{{ zabbix_db_user }}"
+    encoding: UTF8
+    state: present
+    login_user: postgres
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ postgresql_port }}"
+  become: true
+  become_user: postgres
+  when: "'pvzbxdb01' in inventory_hostname"
+
+# 8. db01 でのみ: timescaledb 拡張有効化
+- name: Enable timescaledb extension on db01
+  community.postgresql.postgresql_ext:
+    name: timescaledb
+    db: "{{ zabbix_db_name }}"
+    state: present
+    login_user: postgres
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ postgresql_port }}"
+  become: true
+  become_user: postgres
+  when: "'pvzbxdb01' in inventory_hostname"
+
+# 9. db01 でのみ: Zabbix スキーマインポート（冪等性確保）
+- name: Check if Zabbix schema is already imported on db01
+  community.postgresql.postgresql_query:
+    db: "{{ zabbix_db_name }}"
+    query: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hosts'"
+    login_user: postgres
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ postgresql_port }}"
+  become: true
+  become_user: postgres
+  register: schema_check
+  when: "'pvzbxdb01' in inventory_hostname"
+
+- name: Import Zabbix schema on db01
+  ansible.builtin.shell: |
+    zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | \
+    psql -U {{ zabbix_db_user }} -h {{ ansible_default_ipv4.address }} -p {{ postgresql_port }} {{ zabbix_db_name }}
+  environment:
+    PGPASSWORD: "{{ zabbix_db_password }}"
+  become: true
+  when:
+    - "'pvzbxdb01' in inventory_hostname"
+    - schema_check.query_result[0]['count'] | int == 0
+  changed_when: true
+
+# 10. db01 でのみ: TimescaleDB hypertable 作成
+- name: Create TimescaleDB hypertables for history tables on db01
+  community.postgresql.postgresql_query:
+    db: "{{ zabbix_db_name }}"
+    query: "SELECT create_hypertable('{{ item.table }}', '{{ item.time_column }}', if_not_exists => TRUE, migrate_data => TRUE)"
+    login_user: postgres
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ postgresql_port }}"
+  become: true
+  become_user: postgres
+  loop:
+    - { table: "history",      time_column: "clock" }
+    - { table: "history_uint", time_column: "clock" }
+    - { table: "history_str",  time_column: "clock" }
+    - { table: "history_log",  time_column: "clock" }
+    - { table: "history_text", time_column: "clock" }
+    - { table: "trends",       time_column: "clock" }
+    - { table: "trends_uint",  time_column: "clock" }
+  when: "'pvzbxdb01' in inventory_hostname"
+
+# 11. db01 でのみ: 圧縮ポリシー設定
+- name: Add compression policy for history tables (7 days) on db01
+  community.postgresql.postgresql_query:
+    db: "{{ zabbix_db_name }}"
+    query: >
+      SELECT add_compression_policy('{{ item }}', INTERVAL '7 days', if_not_exists => TRUE)
+    login_user: postgres
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ postgresql_port }}"
+  become: true
+  become_user: postgres
+  loop:
+    - history
+    - history_uint
+    - history_str
+    - history_log
+    - history_text
+  when: "'pvzbxdb01' in inventory_hostname"
+
+- name: Add compression policy for trends tables (90 days) on db01
+  community.postgresql.postgresql_query:
+    db: "{{ zabbix_db_name }}"
+    query: >
+      SELECT add_compression_policy('{{ item }}', INTERVAL '90 days', if_not_exists => TRUE)
+    login_user: postgres
+    login_host: "{{ ansible_default_ipv4.address }}"
+    login_port: "{{ postgresql_port }}"
+  become: true
+  become_user: postgres
+  loop:
+    - trends
+    - trends_uint
+  when: "'pvzbxdb01' in inventory_hostname"
+
+# 12. firewall (ufw) ルール追加
+- name: Allow PostgreSQL port from LAN via ufw
+  community.general.ufw:
+    rule: allow
+    port: "{{ postgresql_port }}"
+    proto: tcp
+    src: 192.168.11.0/24
+  become: true
+
+- name: Allow Patroni REST API port from LAN via ufw
+  community.general.ufw:
+    rule: allow
+    port: "{{ patroni_rest_api_port }}"
+    proto: tcp
+    src: 192.168.11.0/24
+  become: true

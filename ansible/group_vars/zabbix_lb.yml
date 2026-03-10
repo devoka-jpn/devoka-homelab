@@ -1,0 +1,22 @@
+---
+# ─── HAProxy + Keepalived + etcd 設定変数 ────────────────────────────────────
+# 機密情報 (haproxy_stats_password, keepalived_auth_pass) は
+# ansible/secrets/zabbix_vault.yml で管理すること。
+
+keepalived_vip: "192.168.11.200"
+keepalived_interface: "eth0"
+keepalived_vrid: 51
+# keepalived_auth_pass: ansible/secrets/zabbix_vault.yml で定義
+
+haproxy_stats_port: 8404
+haproxy_stats_user: "admin"
+# haproxy_stats_password: ansible/secrets/zabbix_vault.yml で定義
+
+etcd_version: "3.5.17"
+etcd_cluster_name: "zabbix-etcd"
+etcd_client_port: 2379
+etcd_peer_port: 2380
+
+# etcd 初期クラスタメンバー（LB x2 + SV01 の 3 ノード）
+etcd_initial_cluster: >-
+  etcd-lb01=http://{{ hostvars['hip1tk-pvzbxlb01']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxlb01.devoka-jpn.com') }}:2380,etcd-lb02=http://{{ hostvars['hip1tk-pvzbxlb02']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxlb02.devoka-jpn.com') }}:2380,etcd-sv01=http://{{ hostvars['hip1tk-pvzbxsv01']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxsv01.devoka-jpn.com') }}:2380

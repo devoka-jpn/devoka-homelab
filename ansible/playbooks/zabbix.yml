@@ -1,0 +1,94 @@
+---
+# Zabbix エンタープライズ冗長構成 構築 Playbook
+# 仕様書: docs/specs/zabbix.md
+#
+# 実行順序:
+#   1. zabbix_db       - PostgreSQL 16 + TimescaleDB + Patroni クラスタ初期化
+#   2. zabbix_lb       - etcd クラスタ + HAProxy + Keepalived
+#   3. zabbix_server   - Zabbix Server HA Cluster
+#   4. zabbix_frontend - Nginx + PHP-FPM + Zabbix Web UI
+#
+# 実行例:
+#   # 全コンポーネント構築（初回）
+#   ansible-playbook -i inventories/proxmox/hosts.yml playbooks/zabbix.yml \
+#     --vault-password-file secrets/vault_pass
+#
+#   # 特定タグのみ実行
+#   ansible-playbook -i inventories/proxmox/hosts.yml playbooks/zabbix.yml \
+#     --tags zabbix_db --vault-password-file secrets/vault_pass
+#
+#   # Dry-run
+#   ansible-playbook -i inventories/proxmox/hosts.yml playbooks/zabbix.yml \
+#     --check --vault-password-file secrets/vault_pass
+
+# ─── 機密変数の読み込み ─────────────────────────────────────────────────────
+- name: Load Zabbix Vault secrets
+  hosts: zabbix_all
+  gather_facts: false
+  tasks:
+    - name: Include Zabbix vault secrets
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../secrets/zabbix_vault.yml"
+  tags: always
+
+# ─── Phase 1: データベース層 ──────────────────────────────────────────────────
+- name: Phase 1 - Deploy PostgreSQL + TimescaleDB + Patroni
+  hosts: zabbix_db
+  gather_facts: true
+  roles:
+    - role: zabbix_db
+  tags:
+    - zabbix_db
+    - phase1
+
+# ─── Phase 2: ロードバランサー層 ─────────────────────────────────────────────
+- name: Phase 2 - Deploy HAProxy + Keepalived + etcd
+  hosts: zabbix_lb
+  gather_facts: true
+  roles:
+    - role: zabbix_lb
+  tags:
+    - zabbix_lb
+    - phase2
+
+# etcd を zabbix_server の sv01 にも配置（3ノード quorum）
+- name: Phase 2b - Deploy etcd on Zabbix Server sv01
+  hosts: hip1tk-pvzbxsv01
+  gather_facts: true
+  vars:
+    etcd_node_name: etcd-sv01
+    # etcd_initial_cluster は zabbix_lb グループと同じ値を使用
+    etcd_version: "3.5.17"
+    etcd_cluster_name: "zabbix-etcd"
+    etcd_client_port: 2379
+    etcd_peer_port: 2380
+    etcd_initial_cluster: >-
+      etcd-lb01=http://{{ hostvars['hip1tk-pvzbxlb01']['ansible_default_ipv4']['address'] }}:2380,etcd-lb02=http://{{ hostvars['hip1tk-pvzbxlb02']['ansible_default_ipv4']['address'] }}:2380,etcd-sv01=http://{{ hostvars['hip1tk-pvzbxsv01']['ansible_default_ipv4']['address'] }}:2380
+  tasks:
+    - name: Include etcd tasks
+      ansible.builtin.include_role:
+        name: zabbix_lb
+        tasks_from: etcd
+  tags:
+    - zabbix_etcd
+    - phase2
+
+# ─── Phase 3: Zabbix Server 層 ───────────────────────────────────────────────
+- name: Phase 3 - Deploy Zabbix Server HA Cluster
+  hosts: zabbix_server
+  gather_facts: true
+  roles:
+    - role: zabbix_server
+  tags:
+    - zabbix_server
+    - phase3
+
+# ─── Phase 4: Zabbix Frontend 層 ─────────────────────────────────────────────
+- name: Phase 4 - Deploy Zabbix Frontend (Nginx + PHP-FPM)
+  hosts: zabbix_frontend
+  gather_facts: true
+  roles:
+    - role: zabbix_frontend
+  tags:
+    - zabbix_frontend
+    - phase4

@@ -1,0 +1,86 @@
+---
+# HAProxy インストール
+- name: Install HAProxy
+  ansible.builtin.apt:
+    name: haproxy
+    state: present
+    update_cache: true
+  become: true
+
+# HAProxy 設定テンプレート配置
+- name: Deploy HAProxy configuration
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "haproxy -c -f %s"
+  become: true
+  notify: reload haproxy
+
+# HAProxy サービス有効化・起動
+- name: Enable and start HAProxy service
+  ansible.builtin.systemd:
+    name: haproxy
+    enabled: true
+    state: started
+  become: true
+
+# Keepalived インストール
+- name: Install Keepalived
+  ansible.builtin.apt:
+    name: keepalived
+    state: present
+  become: true
+
+# keepalived.conf テンプレート配置
+- name: Deploy Keepalived configuration
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: restart keepalived
+
+# Keepalived サービス有効化・起動
+- name: Enable and start Keepalived service
+  ansible.builtin.systemd:
+    name: keepalived
+    enabled: true
+    state: started
+  become: true
+
+# etcd インストール・設定（etcd.yml に分離）
+- name: Include etcd tasks
+  ansible.builtin.include_tasks: etcd.yml
+
+# ufw: LB 固有のポート許可
+- name: Allow HTTP (80/tcp) via ufw
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+  become: true
+
+- name: Allow HTTPS (443/tcp) via ufw
+  community.general.ufw:
+    rule: allow
+    port: "443"
+    proto: tcp
+  become: true
+
+- name: Allow PostgreSQL proxy (5432/tcp) via ufw
+  community.general.ufw:
+    rule: allow
+    port: "5432"
+    proto: tcp
+  become: true
+
+- name: Allow VRRP (112) via ufw
+  community.general.ufw:
+    rule: allow
+    proto: vrrp
+  become: true

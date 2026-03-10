@@ -63,9 +63,18 @@
 | hip1tk-pvdesk01 | 103 | IaaS管理踏み台VM（IaC実行・開発基盤） | Ubuntu 24.04.4 LTS | 4 | 8GiB | 25GiB | 動的（DDNS） |
 | hip1tk-pvdns01 | 200 | Primary DNS / DHCP サーバ | Ubuntu 24.04.4 LTS | テンプレートデフォルト | テンプレートデフォルト | テンプレートデフォルト | 192.168.11.53 |
 | hip1tk-pvdns02 | 201 | Secondary DNS / DHCP サーバ | Ubuntu 24.04.4 LTS | テンプレートデフォルト | テンプレートデフォルト | テンプレートデフォルト | 192.168.11.54 |
+| hip1tk-pvzbxlb01 | 300 | Zabbix LB1 (HAProxy MASTER) | Ubuntu 24.04.4 LTS | 2 | 2GiB | 20GiB | 動的（DHCP/DDNS）|
+| hip1tk-pvzbxlb02 | 301 | Zabbix LB2 (HAProxy BACKUP) | Ubuntu 24.04.4 LTS | 2 | 2GiB | 20GiB | 動的（DHCP/DDNS）|
+| hip1tk-pvzbxsv01 | 302 | Zabbix Server 1 (Active) | Ubuntu 24.04.4 LTS | 4 | 4GiB | 30GiB | 動的（DHCP/DDNS）|
+| hip1tk-pvzbxsv02 | 303 | Zabbix Server 2 (Standby) | Ubuntu 24.04.4 LTS | 4 | 4GiB | 30GiB | 動的（DHCP/DDNS）|
+| hip1tk-pvzbxfe01 | 304 | Zabbix Frontend 1 | Ubuntu 24.04.4 LTS | 2 | 2GiB | 20GiB | 動的（DHCP/DDNS）|
+| hip1tk-pvzbxfe02 | 305 | Zabbix Frontend 2 | Ubuntu 24.04.4 LTS | 2 | 2GiB | 20GiB | 動的（DHCP/DDNS）|
+| hip1tk-pvzbxdb01 | 306 | Zabbix DB Primary (Patroni) | Ubuntu 24.04.4 LTS | 4 | 8GiB | 50GiB | 動的（DHCP/DDNS）|
+| hip1tk-pvzbxdb02 | 307 | Zabbix DB Replica (Patroni) | Ubuntu 24.04.4 LTS | 4 | 8GiB | 50GiB | 動的（DHCP/DDNS）|
 
 *(※ hip1tk-pvdesk01 はTerraform/Ansible等のIaCツールを実行する管理専用VMであり、Proxmoxクラスタ上のKVM仮想マシンとして稼働する。IPアドレスはDDNSにより動的に割り当てられる。)*
 *(※ hip1tk-pvdns01/02 の詳細仕様・設計は [`docs/specs/ddns.md`](../specs/ddns.md) を参照。)*
+*(※ hip1tk-pvzbx* の詳細仕様・設計は [`docs/specs/zabbix.md`](../specs/zabbix.md) を参照。Keepalived VIP は `192.168.11.200` を使用。)*
 
 ### 2.4. ホスティング・テナントレイヤー (Tenant Layer)
 

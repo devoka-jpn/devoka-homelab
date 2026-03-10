@@ -1,0 +1,117 @@
+---
+# zabbix_ha_node_name はインベントリで定義済みだが、未定義の場合の fallback として set_fact を使用
+- name: Set zabbix_ha_node_name based on inventory_hostname
+  ansible.builtin.set_fact:
+    zabbix_ha_node_name: >-
+      {{ 'zabbix-node-01' if 'pvzbxsv01' in inventory_hostname else 'zabbix-node-02' }}
+  when: zabbix_ha_node_name is not defined
+
+# zabbix_server グループ全ホストの IP をカンマ区切り文字列に結合
+- name: Set zabbix_server_addresses
+  ansible.builtin.set_fact:
+    zabbix_server_addresses: >-
+      {{ groups['zabbix_server']
+         | map('extract', hostvars, ['ansible_default_ipv4', 'address'])
+         | select('defined')
+         | list
+         | join(',') }}
+
+# --- APT リポジトリ ---
+- name: Download Zabbix repository package
+  ansible.builtin.get_url:
+    url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/ubuntu/pool/main/z/zabbix-release/zabbix-release_{{ zabbix_version }}-1+ubuntu22.04_all.deb"
+    dest: /tmp/zabbix-release.deb
+    mode: "0644"
+  become: true
+
+- name: Install Zabbix repository package
+  ansible.builtin.apt:
+    deb: /tmp/zabbix-release.deb
+    state: present
+  become: true
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 0
+  become: true
+
+# --- パッケージインストール ---
+- name: Install Zabbix server and agent2 packages
+  ansible.builtin.apt:
+    name:
+      - "{{ zabbix_server_package }}"
+      - "{{ zabbix_agent2_package }}"
+    state: present
+  become: true
+
+# --- 設定ファイル配置 ---
+- name: Deploy zabbix_server.conf
+  ansible.builtin.template:
+    src: zabbix_server.conf.j2
+    dest: /etc/zabbix/zabbix_server.conf
+    owner: root
+    group: zabbix
+    mode: "0640"
+  become: true
+  notify: restart zabbix-server
+
+- name: Deploy zabbix_agent2.conf
+  ansible.builtin.template:
+    src: zabbix_agent2.conf.j2
+    dest: /etc/zabbix/zabbix_agent2.conf
+    owner: root
+    group: zabbix
+    mode: "0640"
+  become: true
+  notify: restart zabbix-agent2
+
+# --- サービス有効化・起動 ---
+- name: Enable and start zabbix-server
+  ansible.builtin.systemd:
+    name: zabbix-server
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: Enable and start zabbix-agent2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+# --- ufw ルール ---
+- name: Allow Zabbix server port from LAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ zabbix_server_port }}"
+    proto: tcp
+    src: 192.168.0.0/16
+    comment: "Zabbix Server"
+  become: true
+
+- name: Allow Zabbix agent2 port from LAN
+  community.general.ufw:
+    rule: allow
+    port: "10050"
+    proto: tcp
+    src: 192.168.0.0/16
+    comment: "Zabbix Agent2"
+  become: true
+
+# --- HA ステータス確認 ---
+- name: Check Zabbix HA node status
+  ansible.builtin.command:
+    cmd: zabbix_server -R ha_status
+  become: true
+  register: zabbix_ha_status
+  changed_when: false
+  failed_when: false
+
+- name: Log Zabbix HA status
+  ansible.builtin.debug:
+    msg: "HA status on {{ inventory_hostname }} ({{ zabbix_ha_node_name }}): {{ zabbix_ha_status.stdout | default('N/A') }}"
+  when: zabbix_ha_status is defined
