@@ -24,7 +24,6 @@ timescaledb_compress_after_history_days: 7
 timescaledb_compress_after_trends_days: 90
 
 # etcd エンドポイント（LB x2 + SV01 の 3 ノード）
-# 実行時に ansible_default_ipv4.address で解決される
 # Patroni etcd3 の hosts は host:port 形式（http:// 不要）
-etcd_endpoints: >-
-  {{ hostvars['hip1tk-pvzbxlb01']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxlb01.devoka-jpn.com') }}:2379,{{ hostvars['hip1tk-pvzbxlb02']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxlb02.devoka-jpn.com') }}:2379,{{ hostvars['hip1tk-pvzbxsv01']['ansible_default_ipv4']['address'] | default('hip1tk-pvzbxsv01.devoka-jpn.com') }}:2379
+# DNS 名を直接使用（hostvars 依存を排除して --limit 実行時も動作させる）
+etcd_endpoints: "hip1tk-pvzbxlb01.devoka-jpn.com:2379,hip1tk-pvzbxlb02.devoka-jpn.com:2379,hip1tk-pvzbxsv01.devoka-jpn.com:2379"
