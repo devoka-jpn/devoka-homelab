@@ -1,8 +1,18 @@
 ---
+# 前提パッケージ
+- name: Install prerequisite packages
+  ansible.builtin.apt:
+    name:
+      - ufw
+      - acl
+    state: present
+    update_cache: true
+  become: true
+
 # --- APT リポジトリ ---
 - name: Download Zabbix repository package
   ansible.builtin.get_url:
-    url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/ubuntu/pool/main/z/zabbix-release/zabbix-release_{{ zabbix_version }}-1+ubuntu22.04_all.deb"
+    url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/ubuntu/pool/main/z/zabbix-release/zabbix-release_{{ zabbix_version }}-1+ubuntu{{ ansible_distribution_version }}_all.deb"
     dest: /tmp/zabbix-release.deb
     mode: "0644"
   become: true

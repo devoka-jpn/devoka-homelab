@@ -1,9 +1,10 @@
 ---
 # PostgreSQL + TimescaleDB + Patroni 設定変数
 postgresql_version: "16"
+zabbix_version: "7.0"
 timescaledb_version: "2"
 patroni_version: "3.3.2"
-etcd_endpoints: "http://{{ hostvars['hip1tk-pvzbxlb01']['ansible_default_ipv4']['address'] }}:2379,http://{{ hostvars['hip1tk-pvzbxlb02']['ansible_default_ipv4']['address'] }}:2379,http://{{ hostvars['hip1tk-pvzbxsv01']['ansible_default_ipv4']['address'] }}:2379"
+etcd_endpoints: "{{ hostvars['hip1tk-pvzbxlb01']['ansible_default_ipv4']['address'] }}:2379,{{ hostvars['hip1tk-pvzbxlb02']['ansible_default_ipv4']['address'] }}:2379,{{ hostvars['hip1tk-pvzbxsv01']['ansible_default_ipv4']['address'] }}:2379"
 patroni_cluster_name: "zabbix-pg-cluster"
 patroni_rest_api_port: 8008
 postgresql_port: 5432

@@ -41,7 +41,27 @@
     filename: timescaledb
   become: true
 
-# 3. パッケージインストール
+# 3. Zabbix APT リポジトリ追加（zabbix-sql-scripts インストールのため）
+- name: Download Zabbix repository package for sql-scripts
+  ansible.builtin.get_url:
+    url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/ubuntu/pool/main/z/zabbix-release/zabbix-release_{{ zabbix_version }}-1+ubuntu{{ ansible_distribution_version }}_all.deb"
+    dest: /tmp/zabbix-release.deb
+    mode: "0644"
+  become: true
+
+- name: Install Zabbix repository package
+  ansible.builtin.apt:
+    deb: /tmp/zabbix-release.deb
+    state: present
+  become: true
+
+- name: Update apt cache after Zabbix repo
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 0
+  become: true
+
+# 4. パッケージインストール
 - name: Install PostgreSQL, TimescaleDB, Patroni packages
   ansible.builtin.apt:
     name:
@@ -50,6 +70,9 @@
       - python3-psycopg2
       - patroni
       - python3-etcd3
+      - acl
+      - ufw
+      - zabbix-sql-scripts
     state: present
     update_cache: true
   become: true
@@ -75,7 +98,7 @@
 - name: Deploy patroni.yml from template
   ansible.builtin.template:
     src: patroni.yml.j2
-    dest: /etc/patroni/patroni.yml
+    dest: /etc/patroni/config.yml
     owner: postgres
     group: postgres
     mode: "0640"
@@ -89,6 +112,15 @@
     enabled: true
     state: started
   become: true
+
+# Patroni が PostgreSQL クラスタを初期化し TCP 接続を受け付けるまで待機
+- name: Wait for PostgreSQL to accept connections via Patroni
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ postgresql_port }}"
+    delay: 5
+    timeout: 120
+  when: "'pvzbxdb01' in inventory_hostname"
 
 # 7. db01 でのみ: Zabbix DB/ユーザ作成
 - name: Create Zabbix database user on db01
