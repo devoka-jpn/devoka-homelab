@@ -2,7 +2,8 @@
 zabbix_version: "7.0"
 zabbix_frontend_package: "zabbix-frontend-php"
 nginx_package: "nginx"
-php_fpm_package: "php8.2-fpm"
+php_version: "8.3"
+php_fpm_package: "php8.3-fpm"
 zabbix_frontend_port: 8080
 zabbix_db_host: "192.168.11.200"  # HAProxy VIP
 zabbix_db_port: 5432

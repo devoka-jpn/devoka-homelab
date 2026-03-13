@@ -11,15 +11,15 @@
     state: reloaded
   become: true
 
-- name: restart php8.2-fpm
+- name: restart php-fpm
   ansible.builtin.systemd:
-    name: php8.2-fpm
+    name: "php{{ php_version }}-fpm"
     state: restarted
   become: true
 
-- name: reload php8.2-fpm
+- name: reload php-fpm
   ansible.builtin.systemd:
-    name: php8.2-fpm
+    name: "php{{ php_version }}-fpm"
     state: reloaded
   become: true
 
