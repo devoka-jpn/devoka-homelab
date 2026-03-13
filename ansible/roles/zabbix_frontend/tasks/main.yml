@@ -35,6 +35,7 @@
     name:
       - "{{ nginx_package }}"
       - "{{ php_fpm_package }}"
+      - "{{ php_pgsql_package }}"
       - "{{ zabbix_frontend_package }}"
       - zabbix-nginx-conf
       - zabbix-agent2
