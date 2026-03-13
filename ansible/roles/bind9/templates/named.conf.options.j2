@@ -17,8 +17,12 @@ options {
     listen-on { {{ ansible_default_ipv4.address }}; 127.0.0.1; };
     listen-on-v6 { none; };
 
-    # 内部ゾーン以外はゲートウェイへフォワード（スプリットホライズン）
-    forwarders { {{ network_gateway }}; };
+    # 内部ゾーン以外をフォワード（ゲートウェイ優先、パブリックDNSをフォールバック）
+    forwarders {
+{% for fw in bind9_forwarders %}
+        {{ fw }};
+{% endfor %}
+    };
     forward only;
 
     # デフォルトでゾーン転送を拒否（ゾーン単位で上書き）
