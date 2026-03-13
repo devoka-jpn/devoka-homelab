@@ -30,6 +30,7 @@ bootstrap:
     - data-checksums
 
   pg_hba:
+    - local all all peer
     - host replication {{ patroni_replication_user }} 0.0.0.0/0 md5
     - host {{ zabbix_db_name }} {{ zabbix_db_user }} 0.0.0.0/0 md5
     - host all all 0.0.0.0/0 md5
@@ -46,6 +47,7 @@ postgresql:
   listen: "{{ ansible_default_ipv4.address }}:{{ postgresql_port }}"
   connect_address: "{{ ansible_default_ipv4.address }}:{{ postgresql_port }}"
   data_dir: "{{ postgresql_data_dir }}"
+  bin_dir: "/usr/lib/postgresql/{{ postgresql_version }}/bin"
   pgpass: /tmp/pgpass
   authentication:
     replication:
@@ -53,14 +55,16 @@ postgresql:
       password: "{{ patroni_replication_password }}"
     superuser:
       username: postgres
-      password: "{{ postgres_superuser_password | default('') }}"
+      password: "{{ postgres_superuser_password }}"
   parameters:
+    shared_preload_libraries: "timescaledb"
     max_connections: 200
     shared_buffers: 256MB
     effective_cache_size: 768MB
     wal_level: replica
     max_wal_senders: 5
     wal_keep_size: 128MB
+    unix_socket_directories: /var/run/postgresql
     log_destination: stderr
     logging_collector: "on"
     log_directory: pg_log

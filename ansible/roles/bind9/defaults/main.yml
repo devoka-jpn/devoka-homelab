@@ -9,3 +9,11 @@ bind9_config_dir: /etc/bind
 bind9_dynamic_zone_dir: /var/lib/bind
 bind9_cache_dir: /var/cache/bind
 bind9_user: bind
+
+# フォワーダ設定
+# ゲートウェイが外部DNS解決できない場合のフォールバックとして
+# パブリックDNS（Google/Cloudflare）を追加する
+bind9_forwarders:
+  - "{{ network_gateway }}"
+  - "8.8.8.8"
+  - "1.1.1.1"

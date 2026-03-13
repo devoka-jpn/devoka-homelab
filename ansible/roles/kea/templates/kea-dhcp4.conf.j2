@@ -47,6 +47,7 @@
       {
         "id": 1,
         "subnet": "{{ network_cidr }}",
+        "match-client-id": false,
         "pools": [
           {
             "pool": "{{ dhcp_pool_start }} - {{ dhcp_pool_end }}"

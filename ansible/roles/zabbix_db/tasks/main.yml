@@ -41,7 +41,27 @@
     filename: timescaledb
   become: true
 
-# 3. パッケージインストール
+# 3. Zabbix APT リポジトリ追加（zabbix-sql-scripts インストールのため）
+- name: Download Zabbix repository package for sql-scripts
+  ansible.builtin.get_url:
+    url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/ubuntu/pool/main/z/zabbix-release/zabbix-release_{{ zabbix_version }}-1+ubuntu{{ ansible_distribution_version }}_all.deb"
+    dest: /tmp/zabbix-release.deb
+    mode: "0644"
+  become: true
+
+- name: Install Zabbix repository package
+  ansible.builtin.apt:
+    deb: /tmp/zabbix-release.deb
+    state: present
+  become: true
+
+- name: Update apt cache after Zabbix repo
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 0
+  become: true
+
+# 4. パッケージインストール
 - name: Install PostgreSQL, TimescaleDB, Patroni packages
   ansible.builtin.apt:
     name:
@@ -50,6 +70,9 @@
       - python3-psycopg2
       - patroni
       - python3-etcd3
+      - acl
+      - ufw
+      - zabbix-sql-scripts
     state: present
     update_cache: true
   become: true
@@ -62,7 +85,48 @@
   when: "'pvzbxdb01' in inventory_hostname"
   changed_when: true
 
-# 5. patroni.yml をテンプレートから配置
+# 5. apt でインストールされた PostgreSQL サービスを停止・無効化（Patroni に管理させるため）
+- name: Stop and disable system-managed postgresql service
+  ansible.builtin.systemd:
+    name: "postgresql@{{ postgresql_version }}-main"
+    enabled: false
+    state: stopped
+  become: true
+  failed_when: false
+
+- name: Stop postgresql service (generic)
+  ansible.builtin.systemd:
+    name: postgresql
+    state: stopped
+  become: true
+  failed_when: false
+
+# 5b. PGDATA ディレクトリのクリア（Patroni 未管理の場合のみ）
+# patroni.dynamic.json が存在しない場合は apt が初期化したデータと判断してクリア
+- name: Check if Patroni has already initialized PGDATA
+  ansible.builtin.stat:
+    path: "{{ postgresql_data_dir }}/patroni.dynamic.json"
+  register: patroni_dynamic_json
+  become: true
+
+- name: Clear PostgreSQL data directory for Patroni initialization
+  ansible.builtin.file:
+    path: "{{ postgresql_data_dir }}"
+    state: absent
+  become: true
+  when: not patroni_dynamic_json.stat.exists
+
+- name: Recreate PostgreSQL data directory
+  ansible.builtin.file:
+    path: "{{ postgresql_data_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+  become: true
+  when: not patroni_dynamic_json.stat.exists
+
+# 6. patroni.yml をテンプレートから配置
 - name: Create /etc/patroni directory
   ansible.builtin.file:
     path: /etc/patroni
@@ -75,12 +139,16 @@
 - name: Deploy patroni.yml from template
   ansible.builtin.template:
     src: patroni.yml.j2
-    dest: /etc/patroni/patroni.yml
+    dest: /etc/patroni/config.yml
     owner: postgres
     group: postgres
     mode: "0640"
   become: true
   notify: restart patroni
+
+# config 変更を即座に反映するためハンドラを先に実行
+- name: Flush handlers to restart Patroni if config changed
+  ansible.builtin.meta: flush_handlers
 
 # 6. Patroni systemd サービス有効化・起動
 - name: Enable and start Patroni service
@@ -90,15 +158,72 @@
     state: started
   become: true
 
-# 7. db01 でのみ: Zabbix DB/ユーザ作成
+# Patroni が PostgreSQL クラスタを初期化し TCP 接続を受け付けるまで待機
+- name: Wait for PostgreSQL to accept connections via Patroni
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ postgresql_port }}"
+    delay: 10
+    timeout: 180
+  when: "'pvzbxdb01' in inventory_hostname"
+
+# UNIX ソケットが利用可能になるまで追加待機（db01 のみ）
+- name: Wait for PostgreSQL UNIX socket to be ready
+  ansible.builtin.wait_for:
+    path: /var/run/postgresql/.s.PGSQL.5432
+    delay: 5
+    timeout: 60
+  when: "'pvzbxdb01' in inventory_hostname"
+
+# 7. shared_preload_libraries を設定して PostgreSQL を再起動（db01 のみ）
+# psql -c で直接実行（ALTER SYSTEM はトランザクション外が必要）
+- name: Check if shared_preload_libraries already contains timescaledb
+  ansible.builtin.shell: |
+    psql -U postgres -tAc "SHOW shared_preload_libraries;" | grep -q timescaledb && echo "present" || echo "absent"
+  become: true
+  become_user: postgres
+  when: "'pvzbxdb01' in inventory_hostname"
+  register: spl_check
+  changed_when: false
+
+- name: Set shared_preload_libraries for TimescaleDB via ALTER SYSTEM
+  ansible.builtin.shell: |
+    psql -U postgres -c "ALTER SYSTEM SET shared_preload_libraries = 'timescaledb';"
+  become: true
+  become_user: postgres
+  when:
+    - "'pvzbxdb01' in inventory_hostname"
+    - spl_check.stdout == "absent"
+  register: alter_system_result
+  changed_when: true
+
+- name: Restart PostgreSQL via patronictl to apply shared_preload_libraries
+  ansible.builtin.command:
+    cmd: patronictl -c /etc/patroni/config.yml restart {{ patroni_cluster_name }} {{ inventory_hostname }} --force
+  become: true
+  become_user: postgres
+  when:
+    - "'pvzbxdb01' in inventory_hostname"
+    - alter_system_result is changed
+  changed_when: true
+
+- name: Wait for PostgreSQL UNIX socket after patronictl restart
+  ansible.builtin.wait_for:
+    path: /var/run/postgresql/.s.PGSQL.5432
+    delay: 5
+    timeout: 60
+  when:
+    - "'pvzbxdb01' in inventory_hostname"
+    - alter_system_result is changed
+
+# 8. db01 でのみ: Zabbix DB/ユーザ作成
+# UNIX ソケット経由で接続（become_user: postgres + pg_hba: local all all peer）
 - name: Create Zabbix database user on db01
   community.postgresql.postgresql_user:
     name: "{{ zabbix_db_user }}"
     password: "{{ zabbix_db_password }}"
     state: present
     login_user: postgres
-    login_host: "{{ ansible_default_ipv4.address }}"
-    login_port: "{{ postgresql_port }}"
   become: true
   become_user: postgres
   when: "'pvzbxdb01' in inventory_hostname"
@@ -110,8 +235,6 @@
     encoding: UTF8
     state: present
     login_user: postgres
-    login_host: "{{ ansible_default_ipv4.address }}"
-    login_port: "{{ postgresql_port }}"
   become: true
   become_user: postgres
   when: "'pvzbxdb01' in inventory_hostname"
@@ -123,8 +246,6 @@
     db: "{{ zabbix_db_name }}"
     state: present
     login_user: postgres
-    login_host: "{{ ansible_default_ipv4.address }}"
-    login_port: "{{ postgresql_port }}"
   become: true
   become_user: postgres
   when: "'pvzbxdb01' in inventory_hostname"
@@ -135,8 +256,6 @@
     db: "{{ zabbix_db_name }}"
     query: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hosts'"
     login_user: postgres
-    login_host: "{{ ansible_default_ipv4.address }}"
-    login_port: "{{ postgresql_port }}"
   become: true
   become_user: postgres
   register: schema_check
@@ -160,8 +279,6 @@
     db: "{{ zabbix_db_name }}"
     query: "SELECT create_hypertable('{{ item.table }}', '{{ item.time_column }}', if_not_exists => TRUE, migrate_data => TRUE)"
     login_user: postgres
-    login_host: "{{ ansible_default_ipv4.address }}"
-    login_port: "{{ postgresql_port }}"
   become: true
   become_user: postgres
   loop:
@@ -174,15 +291,44 @@
     - { table: "trends_uint",  time_column: "clock" }
   when: "'pvzbxdb01' in inventory_hostname"
 
-# 11. db01 でのみ: 圧縮ポリシー設定
+# 11a. db01 でのみ: hypertable で TimescaleDB 圧縮（columnstore）を有効化
+- name: Enable TimescaleDB compression on history tables
+  community.postgresql.postgresql_query:
+    db: "{{ zabbix_db_name }}"
+    query: "ALTER TABLE {{ item }} SET (timescaledb.compress = true, timescaledb.compress_segmentby = 'itemid')"
+    login_user: postgres
+  become: true
+  become_user: postgres
+  loop:
+    - history
+    - history_uint
+    - history_str
+    - history_log
+    - history_text
+  when: "'pvzbxdb01' in inventory_hostname"
+  failed_when: false
+
+- name: Enable TimescaleDB compression on trends tables
+  community.postgresql.postgresql_query:
+    db: "{{ zabbix_db_name }}"
+    query: "ALTER TABLE {{ item }} SET (timescaledb.compress = true, timescaledb.compress_segmentby = 'itemid')"
+    login_user: postgres
+  become: true
+  become_user: postgres
+  loop:
+    - trends
+    - trends_uint
+  when: "'pvzbxdb01' in inventory_hostname"
+  failed_when: false
+
+# 11b. db01 でのみ: 圧縮ポリシー設定
+# history テーブルの time 列 (clock) は Unix 秒の整数型なので、秒数で指定
+# 7 days = 604800 sec, 90 days = 7776000 sec
 - name: Add compression policy for history tables (7 days) on db01
   community.postgresql.postgresql_query:
     db: "{{ zabbix_db_name }}"
-    query: >
-      SELECT add_compression_policy('{{ item }}', INTERVAL '7 days', if_not_exists => TRUE)
+    query: "SELECT add_compression_policy('{{ item }}', compress_after => {{ timescaledb_compress_after_history_days * 86400 }}, if_not_exists => TRUE)"
     login_user: postgres
-    login_host: "{{ ansible_default_ipv4.address }}"
-    login_port: "{{ postgresql_port }}"
   become: true
   become_user: postgres
   loop:
@@ -196,11 +342,8 @@
 - name: Add compression policy for trends tables (90 days) on db01
   community.postgresql.postgresql_query:
     db: "{{ zabbix_db_name }}"
-    query: >
-      SELECT add_compression_policy('{{ item }}', INTERVAL '90 days', if_not_exists => TRUE)
+    query: "SELECT add_compression_policy('{{ item }}', compress_after => {{ timescaledb_compress_after_trends_days * 86400 }}, if_not_exists => TRUE)"
     login_user: postgres
-    login_host: "{{ ansible_default_ipv4.address }}"
-    login_port: "{{ postgresql_port }}"
   become: true
   become_user: postgres
   loop:

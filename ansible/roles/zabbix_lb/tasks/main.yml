@@ -1,10 +1,19 @@
 ---
+# 前提パッケージ
+- name: Install prerequisite packages
+  ansible.builtin.apt:
+    name:
+      - ufw
+      - acl
+    state: present
+    update_cache: true
+  become: true
+
 # HAProxy インストール
 - name: Install HAProxy
   ansible.builtin.apt:
     name: haproxy
     state: present
-    update_cache: true
   become: true
 
 # HAProxy 設定テンプレート配置
@@ -79,8 +88,10 @@
     proto: tcp
   become: true
 
-- name: Allow VRRP (112) via ufw
-  community.general.ufw:
-    rule: allow
-    proto: vrrp
+- name: Allow VRRP (protocol 112) via iptables
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: "112"
+    jump: ACCEPT
+    comment: "Allow VRRP"
   become: true

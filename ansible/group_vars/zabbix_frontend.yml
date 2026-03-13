@@ -18,7 +18,7 @@ zabbix_server_port: 10051
 zabbix_server_name: "Devoka Homelab Zabbix"
 
 # PHP 設定
-php_version: "8.2"
+php_version: "8.3"
 php_max_execution_time: 300
 php_memory_limit: "128M"
 php_post_max_size: "16M"

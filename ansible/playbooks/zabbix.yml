@@ -21,6 +21,15 @@
 #   ansible-playbook -i inventories/proxmox/hosts.yml playbooks/zabbix.yml \
 #     --check --vault-password-file secrets/vault_pass
 
+# ─── 全ホストのファクト事前収集 ─────────────────────────────────────────────
+# hostvars['hip1tk-pvzbxlb01']['ansible_default_ipv4'] 等を各フェーズで参照するため、
+# Phase 1 実行前に全ホストのファクトを収集しておく必要がある。
+- name: Pre-gather facts from all Zabbix hosts
+  hosts: zabbix_all
+  gather_facts: true
+  tasks: []
+  tags: always
+
 # ─── 機密変数の読み込み ─────────────────────────────────────────────────────
 - name: Load Zabbix Vault secrets
   hosts: zabbix_all
@@ -31,64 +40,85 @@
         file: "{{ playbook_dir }}/../secrets/zabbix_vault.yml"
   tags: always
 
-# ─── Phase 1: データベース層 ──────────────────────────────────────────────────
-- name: Phase 1 - Deploy PostgreSQL + TimescaleDB + Patroni
-  hosts: zabbix_db
-  gather_facts: true
-  roles:
-    - role: zabbix_db
-  tags:
-    - zabbix_db
-    - phase1
-
-# ─── Phase 2: ロードバランサー層 ─────────────────────────────────────────────
-- name: Phase 2 - Deploy HAProxy + Keepalived + etcd
+# ─── Phase 1: etcd クラスタ（Patroni の DCS として DB より先に必要）────────────
+# etcd は Patroni の DCS として使用するため、DB 層より先にセットアップする。
+- name: Phase 1a - Deploy etcd on LB nodes (lb01, lb02)
   hosts: zabbix_lb
   gather_facts: true
-  roles:
-    - role: zabbix_lb
-  tags:
-    - zabbix_lb
-    - phase2
-
-# etcd を zabbix_server の sv01 にも配置（3ノード quorum）
-- name: Phase 2b - Deploy etcd on Zabbix Server sv01
-  hosts: hip1tk-pvzbxsv01
-  gather_facts: true
-  vars:
-    etcd_node_name: etcd-sv01
-    # etcd_initial_cluster は zabbix_lb グループと同じ値を使用
-    etcd_version: "3.5.17"
-    etcd_cluster_name: "zabbix-etcd"
-    etcd_client_port: 2379
-    etcd_peer_port: 2380
-    etcd_initial_cluster: >-
-      etcd-lb01=http://{{ hostvars['hip1tk-pvzbxlb01']['ansible_default_ipv4']['address'] }}:2380,etcd-lb02=http://{{ hostvars['hip1tk-pvzbxlb02']['ansible_default_ipv4']['address'] }}:2380,etcd-sv01=http://{{ hostvars['hip1tk-pvzbxsv01']['ansible_default_ipv4']['address'] }}:2380
   tasks:
+    - name: Install prerequisite packages for etcd
+      ansible.builtin.apt:
+        name:
+          - ufw
+          - acl
+        state: present
+        update_cache: true
+      become: true
     - name: Include etcd tasks
       ansible.builtin.include_role:
         name: zabbix_lb
         tasks_from: etcd
   tags:
     - zabbix_etcd
+    - phase1
+
+- name: Phase 1b - Deploy etcd on Zabbix Server sv01
+  hosts: hip1tk-pvzbxsv01
+  gather_facts: true
+  tasks:
+    - name: Install prerequisite packages for etcd
+      ansible.builtin.apt:
+        name:
+          - ufw
+          - acl
+        state: present
+        update_cache: true
+      become: true
+    - name: Include etcd tasks
+      ansible.builtin.include_role:
+        name: zabbix_lb
+        tasks_from: etcd
+  tags:
+    - zabbix_etcd
+    - phase1
+
+# ─── Phase 2: データベース層 ──────────────────────────────────────────────────
+- name: Phase 2 - Deploy PostgreSQL + TimescaleDB + Patroni
+  hosts: zabbix_db
+  gather_facts: true
+  roles:
+    - role: zabbix_db
+  tags:
+    - zabbix_db
     - phase2
 
-# ─── Phase 3: Zabbix Server 層 ───────────────────────────────────────────────
-- name: Phase 3 - Deploy Zabbix Server HA Cluster
+# ─── Phase 3: ロードバランサー層（HAProxy + Keepalived）────────────────────────
+# etcd は Phase 1 で導入済み。ここでは HAProxy + Keepalived のみ設定する。
+- name: Phase 3 - Deploy HAProxy + Keepalived
+  hosts: zabbix_lb
+  gather_facts: true
+  roles:
+    - role: zabbix_lb
+  tags:
+    - zabbix_lb
+    - phase3
+
+# ─── Phase 4: Zabbix Server 層 ───────────────────────────────────────────────
+- name: Phase 4 - Deploy Zabbix Server HA Cluster
   hosts: zabbix_server
   gather_facts: true
   roles:
     - role: zabbix_server
   tags:
     - zabbix_server
-    - phase3
+    - phase4
 
-# ─── Phase 4: Zabbix Frontend 層 ─────────────────────────────────────────────
-- name: Phase 4 - Deploy Zabbix Frontend (Nginx + PHP-FPM)
+# ─── Phase 5: Zabbix Frontend 層 ─────────────────────────────────────────────
+- name: Phase 5 - Deploy Zabbix Frontend (Nginx + PHP-FPM)
   hosts: zabbix_frontend
   gather_facts: true
   roles:
     - role: zabbix_frontend
   tags:
     - zabbix_frontend
-    - phase4
+    - phase5
