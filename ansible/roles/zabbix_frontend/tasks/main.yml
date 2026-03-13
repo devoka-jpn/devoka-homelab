@@ -5,9 +5,25 @@
     name:
       - ufw
       - acl
+      - locales
     state: present
     update_cache: true
   become: true
+
+# --- ロケール設定 ---
+- name: Generate en_US.UTF-8 locale
+  community.general.locale_gen:
+    name: en_US.UTF-8
+    state: present
+  become: true
+  notify: restart php-fpm
+
+- name: Generate ja_JP.UTF-8 locale
+  community.general.locale_gen:
+    name: ja_JP.UTF-8
+    state: present
+  become: true
+  notify: restart php-fpm
 
 # --- APT リポジトリ ---
 - name: Download Zabbix repository package
